@@ -35,3 +35,58 @@ body {
   color: var(--foreground);
   font-family: var(--font-sans);
 }
+
+/* Save success animations */
+@keyframes pop-in {
+  0% {
+    transform: scale(0.92);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.02);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes draw-circle {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes draw-check {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.save-pop {
+  animation: pop-in 0.32s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.check-circle {
+  stroke-dasharray: 151;
+  stroke-dashoffset: 151;
+  animation: draw-circle 0.5s ease-out forwards;
+}
+
+.check-mark {
+  stroke-dasharray: 48;
+  stroke-dashoffset: 48;
+  animation: draw-check 0.32s 0.42s ease-out forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .save-pop,
+  .check-circle,
+  .check-mark {
+    animation: none;
+  }
+  .check-circle,
+  .check-mark {
+    stroke-dashoffset: 0;
+  }
+}

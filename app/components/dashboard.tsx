@@ -21,6 +21,7 @@ import { SAMPLE_REFERRING_DOMAINS } from "@/lib/sample-data";
 import { FilterPanel } from "./filter-panel";
 import { ReferringDomainsTable } from "./referring-domains-table";
 import { ResultsTable } from "./results-table";
+import { SaveStatus } from "./save-status";
 import { StatusSummary, type Phase } from "./status-summary";
 import { Button, Card, Field, Select, TextInput } from "./ui";
 
@@ -51,6 +52,8 @@ export function Dashboard() {
   const [progress, setProgress] = useState({ done: 0, total: 0 });
   const [saveSummary, setSaveSummary] = useState<AppendSummary | null>(null);
   const [copiedEmpty, setCopiedEmpty] = useState(false);
+  // Synchronous guard so rapid double-clicks can't fire concurrent saves.
+  const savingRef = useRef(false);
 
   // Load worksheet names (Phase 3 read) on mount. Nothing is selected by
   // default — the user must explicitly choose a competitor to enable actions.
@@ -190,8 +193,14 @@ export function Dashboard() {
 
   // Phase 3: append selected records to the chosen worksheet.
   const handleSave = useCallback(async () => {
+    // Block re-entry: a second click while a save is in flight is ignored, so
+    // the same rows can never be appended twice. (The backend also dedupes by
+    // source_url as a second line of defense.)
+    if (savingRef.current) return;
     if (selected.length === 0 || !worksheet) return;
+    savingRef.current = true;
     setError(null);
+    setSaveSummary(null);
     setPhase("saving");
     try {
       const summary = await appendToSheet(worksheet, selected);
@@ -200,6 +209,8 @@ export function Dashboard() {
     } catch (e) {
       setError(e instanceof Error ? e.message : "Save failed.");
       setPhase("error");
+    } finally {
+      savingRef.current = false;
     }
   }, [selected, worksheet]);
 
@@ -356,7 +367,6 @@ export function Dashboard() {
         recordCount={records.length}
         progress={progress}
         error={error}
-        saveSummary={saveSummary}
       />
 
       {/* Phase 1 results — Ahrefs-style referring domains table */}
@@ -407,9 +417,18 @@ export function Dashboard() {
               onClick={handleSave}
               disabled={busy || selected.length === 0 || !worksheet}
             >
-              Save {selected.length} to &quot;{worksheet}&quot;
+              {phase === "saving" ? (
+                <>
+                  <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
+                  Saving…
+                </>
+              ) : (
+                `Save ${selected.length} to "${worksheet}"`
+              )}
             </Button>
           </div>
+
+          <SaveStatus phase={phase} worksheet={worksheet} summary={saveSummary} />
 
           {emptyDomains.length > 0 ? (
             <div className="mb-4 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-700 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-300">

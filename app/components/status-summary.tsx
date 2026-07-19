@@ -1,7 +1,5 @@
 "use client";
 
-import type { AppendSummary } from "@/lib/types";
-
 export type Phase =
   | "idle"
   | "ahrefs"
@@ -19,14 +17,12 @@ export function StatusSummary({
   recordCount,
   progress,
   error,
-  saveSummary,
 }: {
   phase: Phase;
   domainCount: number;
   recordCount: number;
   progress: { done: number; total: number };
   error: string | null;
-  saveSummary: AppendSummary | null;
 }) {
   if (phase === "idle") return null;
 
@@ -91,31 +87,8 @@ export function StatusSummary({
     );
   }
 
-  if (phase === "saving") {
-    return (
-      <div className={`${base} border-border bg-card`}>
-        <Spinner /> Appending rows to Google Sheets…
-      </div>
-    );
-  }
-
-  if (phase === "saved" && saveSummary) {
-    return (
-      <div
-        className={`${base} border-green-300 bg-green-50 text-green-700 dark:border-green-900 dark:bg-green-950/40 dark:text-green-300`}
-      >
-        <span className="font-medium">Done.</span>
-        <span>
-          Added {saveSummary.added} row(s) to &quot;{saveSummary.worksheet}
-          &quot;
-          {saveSummary.skippedDuplicates > 0
-            ? `, skipped ${saveSummary.skippedDuplicates} duplicate(s)`
-            : ""}
-          .
-        </span>
-      </div>
-    );
-  }
+  // Save-flow feedback ("saving" / "saved") is shown next to the Save button
+  // via <SaveStatus>, so it is intentionally not handled here.
 
   return null;
 }
