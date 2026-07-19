@@ -1,6 +1,6 @@
 # Referring Domains Automation
 
-### 🔗 Open the tool → **(https://REPLACE-WITH-YOUR-LIVE-LINK)**
+### 🔗 Open the tool → **(https://competitors-scrapper-xi.vercel.app/)**
 
 > _Not set yet? Whoever deploys the tool (see [Setup & deploy](#setup--deploy-technical--for-whoever-installs-the-tool)) should paste the live URL above so the team can bookmark it._
 
