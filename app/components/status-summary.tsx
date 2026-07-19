@@ -1,0 +1,127 @@
+"use client";
+
+import type { AppendSummary } from "@/lib/types";
+
+export type Phase =
+  | "idle"
+  | "ahrefs"
+  | "domains"
+  | "analyze"
+  | "ready"
+  | "saving"
+  | "saved"
+  | "error";
+
+/** Compact status/progress banner for the pipeline. */
+export function StatusSummary({
+  phase,
+  domainCount,
+  recordCount,
+  progress,
+  error,
+  saveSummary,
+}: {
+  phase: Phase;
+  domainCount: number;
+  recordCount: number;
+  progress: { done: number; total: number };
+  error: string | null;
+  saveSummary: AppendSummary | null;
+}) {
+  if (phase === "idle") return null;
+
+  const base =
+    "rounded-lg border px-4 py-3 text-sm flex items-center gap-3 flex-wrap";
+
+  if (phase === "error") {
+    return (
+      <div
+        className={`${base} border-red-300 bg-red-50 text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300`}
+      >
+        <span className="font-medium">Error:</span>
+        <span>{error}</span>
+      </div>
+    );
+  }
+
+  if (phase === "ahrefs") {
+    return (
+      <div className={`${base} border-border bg-card`}>
+        <Spinner /> Fetching referring domains from Ahrefs…
+      </div>
+    );
+  }
+
+  if (phase === "domains") {
+    return (
+      <div className={`${base} border-border bg-card`}>
+        <span className="font-medium">{domainCount}</span> referring domains
+        found. Review below, then analyze their websites to extract contact
+        details.
+      </div>
+    );
+  }
+
+  if (phase === "analyze") {
+    const pct = progress.total
+      ? Math.round((progress.done / progress.total) * 100)
+      : 0;
+    return (
+      <div className={`${base} border-border bg-card`}>
+        <Spinner />
+        <span>
+          Analyzing websites {progress.done}/{progress.total} ({pct}%)
+        </span>
+        <div className="h-1.5 flex-1 min-w-30 overflow-hidden rounded-full bg-background">
+          <div
+            className="h-full bg-accent transition-all"
+            style={{ width: `${pct}%` }}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  if (phase === "ready") {
+    return (
+      <div className={`${base} border-border bg-card`}>
+        <span className="font-medium">{recordCount}</span> websites analyzed.
+        Review the contact details below, then save to the worksheet.
+      </div>
+    );
+  }
+
+  if (phase === "saving") {
+    return (
+      <div className={`${base} border-border bg-card`}>
+        <Spinner /> Appending rows to Google Sheets…
+      </div>
+    );
+  }
+
+  if (phase === "saved" && saveSummary) {
+    return (
+      <div
+        className={`${base} border-green-300 bg-green-50 text-green-700 dark:border-green-900 dark:bg-green-950/40 dark:text-green-300`}
+      >
+        <span className="font-medium">Done.</span>
+        <span>
+          Added {saveSummary.added} row(s) to &quot;{saveSummary.worksheet}
+          &quot;
+          {saveSummary.skippedDuplicates > 0
+            ? `, skipped ${saveSummary.skippedDuplicates} duplicate(s)`
+            : ""}
+          .
+        </span>
+      </div>
+    );
+  }
+
+  return null;
+}
+
+function Spinner() {
+  return (
+    <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-border border-t-accent" />
+  );
+}

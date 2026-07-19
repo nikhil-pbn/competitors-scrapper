@@ -1,0 +1,452 @@
+"use client";
+
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+
+import type { AhrefsFilters } from "@/lib/ahrefs/types";
+import {
+  hasContactData,
+  type AppendSummary,
+  type BusinessRecord,
+  type ReferringDomain,
+} from "@/lib/types";
+import {
+  analyzeDomains,
+  appendToSheet,
+  fetchDomains,
+  loadWorksheets,
+} from "@/lib/client-api";
+import { competitorUrlFor } from "@/lib/competitors";
+import { parsePastedData, parseReferringDomainsFile } from "@/lib/parse-upload";
+import { SAMPLE_REFERRING_DOMAINS } from "@/lib/sample-data";
+import { FilterPanel } from "./filter-panel";
+import { ReferringDomainsTable } from "./referring-domains-table";
+import { ResultsTable } from "./results-table";
+import { StatusSummary, type Phase } from "./status-summary";
+import { Button, Card, Field, Select, TextInput } from "./ui";
+
+const DEFAULT_FILTERS: AhrefsFilters = {
+  domainKeyword: "dent",
+  status: "all",
+  linkStatus: "any",
+  sinceLastMonth: true,
+};
+
+export function Dashboard() {
+  const [worksheets, setWorksheets] = useState<string[]>([]);
+  const [worksheetsError, setWorksheetsError] = useState<string | null>(null);
+  const [worksheet, setWorksheet] = useState("");
+  const [target, setTarget] = useState("");
+  const [filters, setFilters] = useState<AhrefsFilters>(DEFAULT_FILTERS);
+
+  const [phase, setPhase] = useState<Phase>("idle");
+  const [error, setError] = useState<string | null>(null);
+  const [domains, setDomains] = useState<ReferringDomain[]>([]);
+  const [dataSource, setDataSource] = useState<
+    "live" | "sample" | "upload" | "urls"
+  >("live");
+  const [urlText, setUrlText] = useState("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [records, setRecords] = useState<BusinessRecord[]>([]);
+  const [selected, setSelected] = useState<BusinessRecord[]>([]);
+  const [progress, setProgress] = useState({ done: 0, total: 0 });
+  const [saveSummary, setSaveSummary] = useState<AppendSummary | null>(null);
+  const [copiedEmpty, setCopiedEmpty] = useState(false);
+
+  // Load worksheet names (Phase 3 read) on mount. Nothing is selected by
+  // default — the user must explicitly choose a competitor to enable actions.
+  useEffect(() => {
+    loadWorksheets()
+      .then((names) => setWorksheets(names))
+      .catch((e) => setWorksheetsError(e.message));
+  }, []);
+
+  // Select a competitor/worksheet and auto-fill its preset URL (still editable).
+  function selectWorksheet(name: string) {
+    setWorksheet(name);
+    const url = competitorUrlFor(name);
+    if (url !== undefined) setTarget(url);
+  }
+
+  const busy =
+    phase === "ahrefs" || phase === "analyze" || phase === "saving";
+  // A competitor/worksheet must be selected before any action is allowed.
+  const noCompetitor = !worksheet;
+  const blocked = busy || noCompetitor;
+
+  function resetResults() {
+    setError(null);
+    setSaveSummary(null);
+    setDomains([]);
+    setRecords([]);
+    setSelected([]);
+    setProgress({ done: 0, total: 0 });
+  }
+
+  // Phase 1 only: fetch referring domains and show the Ahrefs-style table.
+  const handleSearch = useCallback(async () => {
+    if (!worksheet || !target.trim()) return;
+    resetResults();
+    setDataSource("live");
+    try {
+      setPhase("ahrefs");
+      const result = await fetchDomains(target.trim(), filters);
+      setDomains(result);
+      setPhase("domains");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Search failed.");
+      setPhase("error");
+    }
+  }, [worksheet, target, filters]);
+
+  // Preview the Phase 1 table with sample data (no API units consumed).
+  const handleSample = useCallback(() => {
+    if (!worksheet) return;
+    resetResults();
+    setDataSource("sample");
+    setDomains(SAMPLE_REFERRING_DOMAINS);
+    setPhase("domains");
+  }, [worksheet]);
+
+  // Use pasted data, skipping the Ahrefs step. Accepts a plain URL list, a
+  // clean CSV/TSV, or a table copied directly from the Ahrefs web UI.
+  const handleAddUrls = useCallback(() => {
+    if (!worksheet) return;
+    resetResults();
+
+    const { domains: parsed, source } = parsePastedData(urlText);
+    if (parsed.length === 0) {
+      setError("No valid URLs or rows found. Paste a URL list, CSV, or Ahrefs table.");
+      setPhase("error");
+      return;
+    }
+    setDataSource(source);
+    setDomains(parsed);
+    setPhase("domains");
+  }, [urlText, worksheet]);
+
+  // Upload a CSV/TSV of previously-fetched domains, skipping the Ahrefs step.
+  const handleUpload = useCallback(
+    async (file: File) => {
+      if (!worksheet) return;
+      resetResults();
+      try {
+        const text = await file.text();
+        const { domains: parsed, unmatchedHeaders } =
+          parseReferringDomainsFile(text);
+        if (parsed.length === 0) {
+          setError("No rows found in the file. Check it has a header + data.");
+          setPhase("error");
+          return;
+        }
+        if (unmatchedHeaders.length > 0) {
+          // Non-fatal: just log which columns were ignored.
+          console.info("Ignored unrecognized columns:", unmatchedHeaders);
+        }
+        setDataSource("upload");
+        setDomains(parsed);
+        setPhase("domains");
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Could not read the file.");
+        setPhase("error");
+      }
+    },
+    [worksheet],
+  );
+
+  // Phase 2: analyze the referring domains' websites (streamed).
+  const handleAnalyze = useCallback(async () => {
+    if (!worksheet || domains.length === 0) return;
+    setError(null);
+    setRecords([]);
+    setSelected([]);
+    setPhase("analyze");
+    setProgress({ done: 0, total: domains.length });
+    try {
+      await analyzeDomains(
+        domains.map((d) => d.domain),
+        {
+          // Stream each result into the table as soon as it's analyzed, so
+          // rows appear live instead of after the whole batch finishes.
+          onProgress: (done, total, record) => {
+            setProgress({ done, total });
+            setRecords((prev) => [...prev, record]);
+          },
+          // Replace with the canonical, complete, ordered set at the end.
+          onDone: (recs) => {
+            setRecords(recs);
+            setPhase("ready");
+          },
+          onError: (message) => {
+            setError(message);
+            setPhase("error");
+          },
+        },
+      );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Analysis failed.");
+      setPhase("error");
+    }
+  }, [worksheet, domains]);
+
+  // Phase 3: append selected records to the chosen worksheet.
+  const handleSave = useCallback(async () => {
+    if (selected.length === 0 || !worksheet) return;
+    setError(null);
+    setPhase("saving");
+    try {
+      const summary = await appendToSheet(worksheet, selected);
+      setSaveSummary(summary);
+      setPhase("saved");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Save failed.");
+      setPhase("error");
+    }
+  }, [selected, worksheet]);
+
+  const showDomains = domains.length > 0;
+  const showRecords = records.length > 0;
+
+  // Only rows with real contact data go in the table; the rest are listed as a
+  // warning so the user knows scraping found nothing for them.
+  const usefulRecords = useMemo(
+    () => records.filter(hasContactData),
+    [records],
+  );
+  const emptyDomains = useMemo(
+    () =>
+      records
+        .filter((r) => !hasContactData(r))
+        .map((r) => r.source_url.replace(/^https?:\/\//, "")),
+    [records],
+  );
+
+  const copyEmptyDomains = useCallback(async () => {
+    try {
+      await navigator.clipboard.writeText(emptyDomains.join("\n"));
+      setCopiedEmpty(true);
+      setTimeout(() => setCopiedEmpty(false), 1500);
+    } catch {
+      // Clipboard may be unavailable (e.g. non-secure context) — ignore.
+    }
+  }, [emptyDomains]);
+
+  return (
+    <div className="flex flex-col gap-6">
+      {/* Search controls */}
+      <Card className="p-5">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <Field
+            label="Competitor / worksheet"
+            hint="required — target worksheet for Search, Upload & URLs"
+          >
+            {worksheetsError ? (
+              <span className="text-xs text-red-500">{worksheetsError}</span>
+            ) : (
+              <Select
+                value={worksheet}
+                onChange={(e) => selectWorksheet(e.target.value)}
+                disabled={busy || worksheets.length === 0}
+              >
+                <option value="">
+                  {worksheets.length === 0
+                    ? "Loading…"
+                    : "Select competitor…"}
+                </option>
+                {worksheets.map((w) => (
+                  <option key={w} value={w}>
+                    {w}
+                  </option>
+                ))}
+              </Select>
+            )}
+          </Field>
+
+          <Field label="Competitor domain" hint="e.g. adit.com">
+            <TextInput
+              value={target}
+              placeholder="competitor.com"
+              disabled={busy}
+              onChange={(e) => setTarget(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleSearch();
+              }}
+            />
+          </Field>
+        </div>
+
+        <div className="mt-5 border-t border-border pt-5">
+          <h2 className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted">
+            Filters
+          </h2>
+          <FilterPanel
+            filters={filters}
+            onChange={setFilters}
+            disabled={blocked}
+          />
+        </div>
+
+        <div className="mt-5 flex flex-wrap items-center justify-end gap-3">
+          {noCompetitor ? (
+            <span className="mr-auto text-xs text-amber-600 dark:text-amber-400">
+              Select a competitor above to enable actions.
+            </span>
+          ) : null}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".csv,.tsv,.txt"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) handleUpload(file);
+              e.target.value = ""; // allow re-uploading the same file
+            }}
+          />
+          <Button
+            variant="secondary"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={blocked}
+          >
+            Upload CSV
+          </Button>
+          <Button variant="ghost" onClick={handleSample} disabled={blocked}>
+            Load sample data
+          </Button>
+          <Button onClick={handleSearch} disabled={blocked || !target.trim()}>
+            {phase === "ahrefs" ? "Fetching…" : "Search"}
+          </Button>
+        </div>
+
+        <details className="mt-4 border-t border-border pt-4">
+          <summary className="cursor-pointer text-sm text-muted">
+            Or paste URLs, a CSV, or an Ahrefs table (skip Ahrefs API)
+          </summary>
+          <div className="mt-3 flex flex-col gap-2">
+            <p className="text-xs text-muted">
+              Paste any of: a plain list of URLs (one per line), a CSV with a
+              header row (Domain, DR, Traffic, …), or a table copied straight
+              from the Ahrefs Referring domains report. All are converted to the
+              table below.
+            </p>
+            <textarea
+              value={urlText}
+              onChange={(e) => setUrlText(e.target.value)}
+              disabled={blocked}
+              rows={6}
+              placeholder={
+                "URLs only:\nbrightdentalcare.com\nhttps://familysmiles.com/\n\nor a CSV:\nDomain,DR,Traffic,First seen\nrosecrestdental.com,35,63,2026-06-30"
+              }
+              className="w-full rounded-md border border-border bg-card p-3 font-mono text-sm outline-none placeholder:text-muted focus:border-accent"
+            />
+            <div className="flex justify-end">
+              <Button
+                onClick={handleAddUrls}
+                disabled={blocked || !urlText.trim()}
+              >
+                Use pasted data
+              </Button>
+            </div>
+          </div>
+        </details>
+      </Card>
+
+      <StatusSummary
+        phase={phase}
+        domainCount={domains.length}
+        recordCount={records.length}
+        progress={progress}
+        error={error}
+        saveSummary={saveSummary}
+      />
+
+      {/* Phase 1 results — Ahrefs-style referring domains table */}
+      {showDomains ? (
+        <Card className="p-5">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <h2 className="flex items-center gap-2 text-sm font-semibold">
+              Referring domains
+              {dataSource === "sample" ? (
+                <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700 dark:bg-amber-950/60 dark:text-amber-300">
+                  SAMPLE DATA
+                </span>
+              ) : dataSource === "upload" ? (
+                <span className="rounded bg-blue-100 px-1.5 py-0.5 text-[10px] font-semibold text-blue-700 dark:bg-blue-950/60 dark:text-blue-300">
+                  UPLOADED
+                </span>
+              ) : dataSource === "urls" ? (
+                <span className="rounded bg-blue-100 px-1.5 py-0.5 text-[10px] font-semibold text-blue-700 dark:bg-blue-950/60 dark:text-blue-300">
+                  URLS ONLY
+                </span>
+              ) : null}
+            </h2>
+            <Button onClick={handleAnalyze} disabled={blocked}>
+              {phase === "analyze"
+                ? "Analyzing…"
+                : `Analyze ${domains.length} websites →`}
+            </Button>
+          </div>
+          <ReferringDomainsTable domains={domains} exportDisabled={blocked} />
+        </Card>
+      ) : phase === "domains" ? (
+        <Card className="p-10 text-center text-sm text-muted">
+          No referring domains matched your filters.
+        </Card>
+      ) : null}
+
+      {/* Phase 2 results — enriched contact records for review + save */}
+      {showRecords ? (
+        <Card className="p-5">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <h2 className="text-sm font-semibold">
+              Contact details{" "}
+              <span className="font-normal text-muted">
+                ({usefulRecords.length})
+              </span>
+            </h2>
+            <Button
+              onClick={handleSave}
+              disabled={busy || selected.length === 0 || !worksheet}
+            >
+              Save {selected.length} to &quot;{worksheet}&quot;
+            </Button>
+          </div>
+
+          {emptyDomains.length > 0 ? (
+            <div className="mb-4 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-700 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-300">
+              <div className="flex items-start justify-between gap-3">
+                <p>
+                  <span className="font-medium">
+                    {emptyDomains.length} site
+                    {emptyDomains.length > 1 ? "s" : ""} had no extractable
+                    contact details and{" "}
+                    {emptyDomains.length > 1 ? "were" : "was"} excluded:
+                  </span>{" "}
+                  {emptyDomains.join(", ")}
+                </p>
+                <button
+                  type="button"
+                  onClick={copyEmptyDomains}
+                  className="shrink-0 rounded border border-amber-400 px-2 py-1 text-[11px] font-medium hover:bg-amber-100 dark:border-amber-700 dark:hover:bg-amber-900/40"
+                >
+                  {copiedEmpty ? "Copied!" : "Copy URLs"}
+                </button>
+              </div>
+            </div>
+          ) : null}
+
+          {usefulRecords.length > 0 ? (
+            <ResultsTable
+              records={usefulRecords}
+              onSelectedChange={setSelected}
+              exportDisabled={blocked}
+            />
+          ) : phase !== "analyze" ? (
+            <p className="py-6 text-center text-sm text-muted">
+              No contact details could be extracted from any site.
+            </p>
+          ) : null}
+        </Card>
+      ) : null}
+    </div>
+  );
+}
