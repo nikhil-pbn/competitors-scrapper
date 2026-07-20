@@ -71,6 +71,8 @@ export function Dashboard() {
   const [copiedEmpty, setCopiedEmpty] = useState(false);
   // Source-URL keys the user manually moved out of the table into the no-data list.
   const [excludedUrls, setExcludedUrls] = useState<Set<string>>(new Set());
+  // Keys of no/low-data URLs the user pulled back into the table.
+  const [includedUrls, setIncludedUrls] = useState<Set<string>>(new Set());
   // Rows the user typed in by hand (merged with scraped results, override by URL).
   const [manualRecords, setManualRecords] = useState<BusinessRecord[]>([]);
   // Synchronous guard so rapid double-clicks can't fire concurrent saves.
@@ -104,6 +106,7 @@ export function Dashboard() {
     setRecords([]);
     setSelected([]);
     setExcludedUrls(new Set());
+    setIncludedUrls(new Set());
     setManualRecords([]);
     setProgress({ done: 0, total: 0 });
   }
@@ -186,6 +189,7 @@ export function Dashboard() {
     setRecords([]);
     setSelected([]);
     setExcludedUrls(new Set());
+    setIncludedUrls(new Set());
     setManualRecords([]);
     setPhase("analyze");
     setProgress({ done: 0, total: domains.length });
@@ -261,35 +265,59 @@ export function Dashboard() {
     return out;
   }, [records, manualRecords]);
 
-  // Table = rows with real contact data that the user hasn't manually set aside.
-  const tableRecords = useMemo(
-    () =>
-      mergedRecords.filter(
-        (r) => hasContactData(r) && !excludedUrls.has(sourceKey(r.source_url)),
-      ),
-    [mergedRecords, excludedUrls],
+  // Whether a record belongs in the table: not set aside, and either it has
+  // contact data or the user explicitly pulled it back in from the no-data list.
+  const inTable = useCallback(
+    (r: BusinessRecord) => {
+      const key = sourceKey(r.source_url);
+      return (
+        !excludedUrls.has(key) && (hasContactData(r) || includedUrls.has(key))
+      );
+    },
+    [excludedUrls, includedUrls],
   );
 
-  // No-data list = auto-empty rows + rows the user moved out. Shown as a
-  // warning and copied by the "Copy URLs" button.
-  const noDataDomains = useMemo(() => {
+  const tableRecords = useMemo(
+    () => mergedRecords.filter(inTable),
+    [mergedRecords, inTable],
+  );
+
+  // No-data list = everything not in the table. Each carries its match key so
+  // it can be pulled back in, plus a display domain for the warning + copy.
+  const noDataItems = useMemo(() => {
     const seen = new Set<string>();
-    const out: string[] = [];
+    const out: { key: string; display: string }[] = [];
     for (const r of mergedRecords) {
-      if (hasContactData(r) && !excludedUrls.has(sourceKey(r.source_url)))
-        continue;
-      const stripped = r.source_url.replace(/^https?:\/\//, "");
-      if (stripped && !seen.has(stripped)) {
-        seen.add(stripped);
-        out.push(stripped);
-      }
+      if (inTable(r)) continue;
+      const key = sourceKey(r.source_url);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push({ key, display: r.source_url.replace(/^https?:\/\//, "") });
     }
     return out;
-  }, [mergedRecords, excludedUrls]);
+  }, [mergedRecords, inTable]);
 
   // Move a row out of the table into the no-data list.
   const handleExclude = useCallback((record: BusinessRecord) => {
-    setExcludedUrls((prev) => new Set(prev).add(sourceKey(record.source_url)));
+    const key = sourceKey(record.source_url);
+    setExcludedUrls((prev) => new Set(prev).add(key));
+    setIncludedUrls((prev) => {
+      if (!prev.has(key)) return prev;
+      const next = new Set(prev);
+      next.delete(key);
+      return next;
+    });
+  }, []);
+
+  // Pull a no/low-data URL back into the table (with whatever details it has).
+  const handleIncludeFromNoData = useCallback((key: string) => {
+    setIncludedUrls((prev) => new Set(prev).add(key));
+    setExcludedUrls((prev) => {
+      if (!prev.has(key)) return prev;
+      const next = new Set(prev);
+      next.delete(key);
+      return next;
+    });
   }, []);
 
   // Add a hand-researched row: it joins the table and un-excludes that URL.
@@ -313,13 +341,15 @@ export function Dashboard() {
 
   const copyNoDataDomains = useCallback(async () => {
     try {
-      await navigator.clipboard.writeText(noDataDomains.join("\n"));
+      await navigator.clipboard.writeText(
+        noDataItems.map((i) => i.display).join("\n"),
+      );
       setCopiedEmpty(true);
       setTimeout(() => setCopiedEmpty(false), 1500);
     } catch {
       // Clipboard may be unavailable (e.g. non-secure context) — ignore.
     }
-  }, [noDataDomains]);
+  }, [noDataItems]);
 
   return (
     <div className="flex flex-col gap-6">
@@ -519,16 +549,14 @@ export function Dashboard() {
             </div>
           </details>
 
-          {noDataDomains.length > 0 ? (
-            <div className="mb-4 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-700 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-300">
-              <div className="flex items-start justify-between gap-3">
-                <p>
-                  <span className="font-medium">
-                    {noDataDomains.length} site
-                    {noDataDomains.length > 1 ? "s" : ""} with no / low contact
-                    details (excluded from save):
-                  </span>{" "}
-                  {noDataDomains.join(", ")}
+          {noDataItems.length > 0 ? (
+            <div className="mb-4 rounded-md border border-amber-300 bg-amber-50 px-3 py-2.5 text-xs text-amber-700 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-300">
+              <div className="mb-2 flex items-start justify-between gap-3">
+                <p className="font-medium">
+                  {noDataItems.length} site
+                  {noDataItems.length > 1 ? "s" : ""} with no / low contact
+                  details (excluded from save) — click ＋ to add one back to the
+                  table:
                 </p>
                 <button
                   type="button"
@@ -537,6 +565,24 @@ export function Dashboard() {
                 >
                   {copiedEmpty ? "Copied!" : "Copy URLs"}
                 </button>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {noDataItems.map((item) => (
+                  <span
+                    key={item.key}
+                    className="inline-flex items-center gap-1 rounded border border-amber-300 bg-amber-100/60 py-0.5 pl-2 pr-0.5 dark:border-amber-800 dark:bg-amber-900/40"
+                  >
+                    {item.display}
+                    <button
+                      type="button"
+                      onClick={() => handleIncludeFromNoData(item.key)}
+                      title="Add this URL back to the table"
+                      className="rounded px-1 font-semibold text-amber-700 hover:bg-amber-200 dark:text-amber-300 dark:hover:bg-amber-800"
+                    >
+                      ＋
+                    </button>
+                  </span>
+                ))}
               </div>
             </div>
           ) : null}

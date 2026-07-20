@@ -26,15 +26,23 @@ export function SaveStatus({
 
   if (phase === "saved" && summary) {
     return (
-      <div className="save-pop mb-4 flex items-center gap-4 rounded-lg border border-green-300 bg-gradient-to-r from-green-50 to-emerald-50 px-4 py-4 dark:border-green-900 dark:from-green-950/50 dark:to-emerald-950/40">
+      <div className="save-pop mb-4 flex items-center gap-4 rounded-lg border border-green-300 bg-linear-to-r from-green-50 to-emerald-50 px-4 py-4 dark:border-green-900 dark:from-green-950/50 dark:to-emerald-950/40">
         <SuccessCheck />
         <div className="text-sm">
           <p className="font-semibold text-green-800 dark:text-green-300">
             Saved to “{summary.worksheet}”
           </p>
           <p className="text-green-700/90 dark:text-green-400/90">
-            <span className="font-medium">{summary.added}</span> row
-            {summary.added === 1 ? "" : "s"} added
+            <span className="font-medium">{summary.added}</span> added
+            {" · "}
+            <span className="font-medium">{summary.updated}</span> updated
+            {summary.unchanged > 0 ? (
+              <>
+                {" · "}
+                <span className="font-medium">{summary.unchanged}</span>{" "}
+                unchanged
+              </>
+            ) : null}
             {summary.skippedDuplicates > 0 ? (
               <>
                 {" · "}
@@ -45,9 +53,6 @@ export function SaveStatus({
                 {summary.skippedDuplicates === 1 ? "" : "s"} skipped
               </>
             ) : null}
-            {summary.added === 0 && summary.skippedDuplicates > 0
-              ? " (all already in the sheet)"
-              : ""}
           </p>
         </div>
       </div>

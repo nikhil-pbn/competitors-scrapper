@@ -104,13 +104,17 @@ export function emptyBusinessRecord(sourceUrl: string): BusinessRecord {
   };
 }
 
-/** Phase 3 result: outcome of appending records to a worksheet. */
+/** Phase 3 result: outcome of upserting records into a worksheet. */
 export interface AppendSummary {
   worksheet: string;
-  /** Rows actually appended. */
+  /** New rows appended (source_url not previously in the sheet). */
   added: number;
-  /** Records skipped because their source_url already existed. */
+  /** Existing rows changed in place (at least one cell differed). */
+  updated: number;
+  /** Existing rows that matched but had identical data (nothing written). */
+  unchanged: number;
+  /** Records skipped as duplicates within the same save batch. */
   skippedDuplicates: number;
-  /** Total records received for this append. */
+  /** Total records received for this save. */
   received: number;
 }
