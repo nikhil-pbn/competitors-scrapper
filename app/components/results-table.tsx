@@ -165,7 +165,7 @@ export function ResultsTable({
         </div>
       </div>
 
-      <div className="max-h-[560px] overflow-auto rounded-lg border border-border">
+      <div className="max-h-140 overflow-auto rounded-lg border border-border">
         <table className="w-full border-collapse text-sm">
           <thead className="sticky top-0 z-10 bg-card">
             {table.getHeaderGroups().map((hg) => (
