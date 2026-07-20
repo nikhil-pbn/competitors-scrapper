@@ -30,10 +30,13 @@ const COLUMNS: { key: keyof BusinessRecord; header: string }[] = [
 export function ResultsTable({
   records,
   onSelectedChange,
+  onExclude,
   exportDisabled,
 }: {
   records: BusinessRecord[];
   onSelectedChange: (selected: BusinessRecord[]) => void;
+  /** Move a row out of the table and into the no-data list. */
+  onExclude?: (record: BusinessRecord) => void;
   exportDisabled?: boolean;
 }) {
   const [sorting, setSorting] = useState<SortingState>([]);
@@ -87,8 +90,29 @@ export function ResultsTable({
       },
     }));
 
-    return [selectCol, ...dataCols];
-  }, []);
+    if (!onExclude) return [selectCol, ...dataCols];
+
+    const actionCol: ColumnDef<BusinessRecord> = {
+      id: "actions",
+      header: "",
+      enableSorting: false,
+      // Only offered once a row is unchecked — so it's a deliberate two-step:
+      // uncheck to skip from save, then optionally push it to the no-data list.
+      cell: ({ row }) =>
+        row.getIsSelected() ? null : (
+          <button
+            type="button"
+            onClick={() => onExclude(row.original)}
+            title="Remove from the list and add to the no-data URLs"
+            className="whitespace-nowrap rounded border border-border px-2 py-0.5 text-[11px] text-muted transition-colors hover:border-amber-400 hover:text-amber-600"
+          >
+            Move to no-data
+          </button>
+        ),
+    };
+
+    return [selectCol, ...dataCols, actionCol];
+  }, [onExclude]);
 
   const table = useReactTable({
     data: records,

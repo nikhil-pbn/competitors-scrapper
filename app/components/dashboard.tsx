@@ -18,6 +18,7 @@ import {
 import { competitorUrlFor } from "@/lib/competitors";
 import { parsePastedData, parseReferringDomainsFile } from "@/lib/parse-upload";
 import { SAMPLE_REFERRING_DOMAINS } from "@/lib/sample-data";
+import { AddRecordForm } from "./add-record-form";
 import { FilterPanel } from "./filter-panel";
 import { ReferringDomainsTable } from "./referring-domains-table";
 import { ResultsTable } from "./results-table";
@@ -31,6 +32,22 @@ const DEFAULT_FILTERS: AhrefsFilters = {
   linkStatus: "any",
   sinceLastMonth: true,
 };
+
+/** Normalize a source URL for matching (protocol/path/case-insensitive). */
+function sourceKey(url: string): string {
+  return url
+    .trim()
+    .replace(/^https?:\/\//i, "")
+    .replace(/\/+$/, "")
+    .toLowerCase();
+}
+
+/** Ensure a manually-entered URL has a protocol so links work. */
+function normalizeSourceUrl(url: string): string {
+  const u = url.trim();
+  if (!u) return u;
+  return /^https?:\/\//i.test(u) ? u : `https://${u.replace(/^\/+/, "")}`;
+}
 
 export function Dashboard() {
   const [worksheets, setWorksheets] = useState<string[]>([]);
@@ -52,6 +69,10 @@ export function Dashboard() {
   const [progress, setProgress] = useState({ done: 0, total: 0 });
   const [saveSummary, setSaveSummary] = useState<AppendSummary | null>(null);
   const [copiedEmpty, setCopiedEmpty] = useState(false);
+  // Source-URL keys the user manually moved out of the table into the no-data list.
+  const [excludedUrls, setExcludedUrls] = useState<Set<string>>(new Set());
+  // Rows the user typed in by hand (merged with scraped results, override by URL).
+  const [manualRecords, setManualRecords] = useState<BusinessRecord[]>([]);
   // Synchronous guard so rapid double-clicks can't fire concurrent saves.
   const savingRef = useRef(false);
 
@@ -82,6 +103,8 @@ export function Dashboard() {
     setDomains([]);
     setRecords([]);
     setSelected([]);
+    setExcludedUrls(new Set());
+    setManualRecords([]);
     setProgress({ done: 0, total: 0 });
   }
 
@@ -162,6 +185,8 @@ export function Dashboard() {
     setError(null);
     setRecords([]);
     setSelected([]);
+    setExcludedUrls(new Set());
+    setManualRecords([]);
     setPhase("analyze");
     setProgress({ done: 0, total: domains.length });
     try {
@@ -215,31 +240,86 @@ export function Dashboard() {
   }, [selected, worksheet]);
 
   const showDomains = domains.length > 0;
-  const showRecords = records.length > 0;
+  const showRecords = records.length > 0 || manualRecords.length > 0;
 
-  // Only rows with real contact data go in the table; the rest are listed as a
-  // warning so the user knows scraping found nothing for them.
-  const usefulRecords = useMemo(
-    () => records.filter(hasContactData),
-    [records],
-  );
-  const emptyDomains = useMemo(
+  // Scraped + manual results, with manual entries overriding scraped ones by URL.
+  const mergedRecords = useMemo(() => {
+    const manualByKey = new Map(
+      manualRecords.map((r) => [sourceKey(r.source_url), r]),
+    );
+    const out: BusinessRecord[] = [];
+    const scrapedKeys = new Set<string>();
+    for (const r of records) {
+      const k = sourceKey(r.source_url);
+      scrapedKeys.add(k);
+      out.push(manualByKey.get(k) ?? r);
+    }
+    // Manual rows for URLs that weren't in the scraped set.
+    for (const r of manualRecords) {
+      if (!scrapedKeys.has(sourceKey(r.source_url))) out.push(r);
+    }
+    return out;
+  }, [records, manualRecords]);
+
+  // Table = rows with real contact data that the user hasn't manually set aside.
+  const tableRecords = useMemo(
     () =>
-      records
-        .filter((r) => !hasContactData(r))
-        .map((r) => r.source_url.replace(/^https?:\/\//, "")),
-    [records],
+      mergedRecords.filter(
+        (r) => hasContactData(r) && !excludedUrls.has(sourceKey(r.source_url)),
+      ),
+    [mergedRecords, excludedUrls],
   );
 
-  const copyEmptyDomains = useCallback(async () => {
+  // No-data list = auto-empty rows + rows the user moved out. Shown as a
+  // warning and copied by the "Copy URLs" button.
+  const noDataDomains = useMemo(() => {
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (const r of mergedRecords) {
+      if (hasContactData(r) && !excludedUrls.has(sourceKey(r.source_url)))
+        continue;
+      const stripped = r.source_url.replace(/^https?:\/\//, "");
+      if (stripped && !seen.has(stripped)) {
+        seen.add(stripped);
+        out.push(stripped);
+      }
+    }
+    return out;
+  }, [mergedRecords, excludedUrls]);
+
+  // Move a row out of the table into the no-data list.
+  const handleExclude = useCallback((record: BusinessRecord) => {
+    setExcludedUrls((prev) => new Set(prev).add(sourceKey(record.source_url)));
+  }, []);
+
+  // Add a hand-researched row: it joins the table and un-excludes that URL.
+  const handleAddManual = useCallback((record: BusinessRecord) => {
+    const normalized: BusinessRecord = {
+      ...record,
+      source_url: normalizeSourceUrl(record.source_url),
+    };
+    const key = sourceKey(normalized.source_url);
+    setExcludedUrls((prev) => {
+      if (!prev.has(key)) return prev;
+      const next = new Set(prev);
+      next.delete(key);
+      return next;
+    });
+    setManualRecords((prev) => [
+      ...prev.filter((r) => sourceKey(r.source_url) !== key),
+      normalized,
+    ]);
+  }, []);
+
+  const copyNoDataDomains = useCallback(async () => {
     try {
-      await navigator.clipboard.writeText(emptyDomains.join("\n"));
+      await navigator.clipboard.writeText(noDataDomains.join("\n"));
       setCopiedEmpty(true);
       setTimeout(() => setCopiedEmpty(false), 1500);
     } catch {
       // Clipboard may be unavailable (e.g. non-secure context) — ignore.
     }
-  }, [emptyDomains]);
+  }, [noDataDomains]);
 
   return (
     <div className="flex flex-col gap-6">
@@ -410,7 +490,7 @@ export function Dashboard() {
             <h2 className="text-sm font-semibold">
               Contact details{" "}
               <span className="font-normal text-muted">
-                ({usefulRecords.length})
+                ({tableRecords.length})
               </span>
             </h2>
             <Button
@@ -430,21 +510,29 @@ export function Dashboard() {
 
           <SaveStatus phase={phase} worksheet={worksheet} summary={saveSummary} />
 
-          {emptyDomains.length > 0 ? (
+          <details className="mb-4">
+            <summary className="cursor-pointer text-sm text-muted">
+              ＋ Add a row manually (for URLs you researched by hand)
+            </summary>
+            <div className="mt-3">
+              <AddRecordForm onAdd={handleAddManual} disabled={blocked} />
+            </div>
+          </details>
+
+          {noDataDomains.length > 0 ? (
             <div className="mb-4 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-700 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-300">
               <div className="flex items-start justify-between gap-3">
                 <p>
                   <span className="font-medium">
-                    {emptyDomains.length} site
-                    {emptyDomains.length > 1 ? "s" : ""} had no extractable
-                    contact details and{" "}
-                    {emptyDomains.length > 1 ? "were" : "was"} excluded:
+                    {noDataDomains.length} site
+                    {noDataDomains.length > 1 ? "s" : ""} with no / low contact
+                    details (excluded from save):
                   </span>{" "}
-                  {emptyDomains.join(", ")}
+                  {noDataDomains.join(", ")}
                 </p>
                 <button
                   type="button"
-                  onClick={copyEmptyDomains}
+                  onClick={copyNoDataDomains}
                   className="shrink-0 rounded border border-amber-400 px-2 py-1 text-[11px] font-medium hover:bg-amber-100 dark:border-amber-700 dark:hover:bg-amber-900/40"
                 >
                   {copiedEmpty ? "Copied!" : "Copy URLs"}
@@ -453,15 +541,17 @@ export function Dashboard() {
             </div>
           ) : null}
 
-          {usefulRecords.length > 0 ? (
+          {tableRecords.length > 0 ? (
             <ResultsTable
-              records={usefulRecords}
+              records={tableRecords}
               onSelectedChange={setSelected}
+              onExclude={handleExclude}
               exportDisabled={blocked}
             />
           ) : phase !== "analyze" ? (
             <p className="py-6 text-center text-sm text-muted">
-              No contact details could be extracted from any site.
+              No contact details to show — all analyzed sites are in the no-data
+              list above.
             </p>
           ) : null}
         </Card>
