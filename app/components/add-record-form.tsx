@@ -61,7 +61,7 @@ export function AddRecordForm({
           </Field>
         ))}
       </div>
-      <div className="mt-3 flex items-center justify-end gap-3">
+      <div className="mt-3 flex max-md:flex-col items-center justify-end gap-3">
         {!valid ? (
           <span className="text-xs text-muted">
             Enter a Source URL and at least one detail.

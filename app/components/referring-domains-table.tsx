@@ -117,7 +117,7 @@ export function ReferringDomainsTable({
         <span className="text-sm font-medium">
           {domains.length} referring domains
         </span>
-        <div className="flex items-center gap-3">
+        <div className="flex max-md:flex-col items-center gap-3">
           <input
             value={globalFilter}
             onChange={(e) => setGlobalFilter(e.target.value)}
@@ -134,7 +134,7 @@ export function ReferringDomainsTable({
         </div>
       </div>
 
-      <div className="max-h-[520px] overflow-auto rounded-lg border border-border">
+      <div className="max-h-130 overflow-auto rounded-lg border border-border">
         <table className="w-full border-collapse text-sm">
           <thead className="sticky top-0 z-10 bg-card">
             {table.getHeaderGroups().map((hg) => (
