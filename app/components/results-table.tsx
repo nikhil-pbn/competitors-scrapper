@@ -219,7 +219,7 @@ export function ResultsTable({
         </table>
       </div>
 
-      <div className="flex items-center justify-between text-sm text-muted">
+      <div className="flex max-md:flex-col items-center justify-between text-sm text-muted">
         <span>
           Page {table.getState().pagination.pageIndex + 1} of{" "}
           {table.getPageCount()} · {records.length} rows
