@@ -2,7 +2,6 @@
 
 ### 🔗 Open the tool → **(https://competitors-scrapper-xi.vercel.app/)**
 
-> _Not set yet? Whoever deploys the tool (see [Setup & deploy](#setup--deploy-technical--for-whoever-installs-the-tool)) should paste the live URL above so the team can bookmark it._
 
 ---
 
@@ -59,15 +58,26 @@ Results **appear live** as it goes, with a progress bar.
 - Sites where nothing useful was found are **left out** and listed in a yellow note,
   with a **Copy URLs** button so you can grab them if you want to check by hand.
 
-### 4. Review and save
+### 4. Review, edit, and save
 Look over the **Contact details** table. You can sort, search, and untick any rows
-you don't want. Then click **Save … to "<competitor>"**.
+you don't want to save.
 
-- The rows are added to that competitor's tab in the master sheet.
-- **Duplicates are skipped** automatically (a site already in the sheet won't be added twice).
-- Your existing rows are never changed — new ones are added below.
+- **Uncheck a row** you'd rather leave out → a **Move to no-data** button appears if
+  you want to set it aside entirely.
+- **Add a row by hand** — found details for a site the tool missed? Open **Add a
+  record**, enter the source URL plus at least one detail, and it joins the table to
+  be saved with everything else.
+- Sites listed in the yellow "no data" note each have a **＋** to pull them back into
+  the table once you've filled in what you found.
 
-You'll see a confirmation of how many were added and how many duplicates were skipped.
+Then click **Save … to "<competitor>"**. You'll see a smooth saving state, then a
+confirmation card with the exact breakdown.
+
+- New sites are **added** as new rows.
+- Sites already in the sheet are **updated** if a detail changed, or left **unchanged**
+  if nothing's different. (Matching is by the site's source URL, which is never overwritten.)
+- The card shows **added · updated · unchanged · duplicates skipped**.
+- Clicking Save twice by accident won't double-add anything — it's safe to click again.
 
 ---
 
@@ -82,6 +92,8 @@ You'll see a confirmation of how many were added and how many duplicates were sk
 
 ## Good to know
 
+- **Light or dark mode** — use the ☀️ / 🌙 button in the top-right corner to switch
+  themes anytime. Your choice is remembered on your device.
 - **Copy from Ahrefs works directly** — no need to export a file. Just copy the table and paste it.
 - **You don't need Ahrefs at all** if you already have a list — use Upload or Paste.
 - Some sites hide their info, so a few fields (especially owner/manager names) may be

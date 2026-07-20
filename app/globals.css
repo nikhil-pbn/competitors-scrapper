@@ -1,12 +1,31 @@
 @import "tailwindcss";
 
+/*
+ * Theme is class-driven: the `dark:` utility variant fires whenever the `.dark`
+ * class is present on <html> (toggled by ThemeProvider). Light is the default;
+ * adding `.dark` swaps the theme variables below so every `dark:*` override and
+ * every `var(--*)` color follows the selected theme.
+ */
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
+  color-scheme: light;
   --background: #fafafa;
   --foreground: #18181b;
   --card: #ffffff;
   --border: #e4e4e7;
   --muted: #71717a;
   --accent: #4f46e5;
+}
+
+.dark {
+  color-scheme: dark;
+  --background: #09090b;
+  --foreground: #fafafa;
+  --card: #18181b;
+  --border: #27272a;
+  --muted: #a1a1aa;
+  --accent: #6366f1;
 }
 
 @theme inline {
@@ -17,17 +36,6 @@
   --color-muted: var(--muted);
   --color-accent: var(--accent);
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #09090b;
-    --foreground: #fafafa;
-    --card: #18181b;
-    --border: #27272a;
-    --muted: #a1a1aa;
-    --accent: #6366f1;
-  }
 }
 
 body {

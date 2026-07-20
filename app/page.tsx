@@ -1,4 +1,5 @@
 import { Dashboard } from "./components/dashboard";
+import { ThemeToggle } from "./components/theme-toggle";
 
 export default function Home() {
   return (
@@ -18,6 +19,7 @@ export default function Home() {
               </p>
             </div>
           </div>
+          <ThemeToggle />
         </div>
       </header>
       <main className="mx-auto w-full flex-1 px-6 py-8">

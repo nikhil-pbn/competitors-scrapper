@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
+import { ThemeProvider } from "./components/theme-provider";
+import { ThemeScript } from "./components/theme-script";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -22,9 +24,11 @@ export default function RootLayout({
     <html
       lang="en"
       className={`${inter.variable} w-full antialiased`}
+      suppressHydrationWarning
     >
       <body className="min-h-dvh w-full flex flex-col bg-background text-foreground">
-        {children}
+        <ThemeScript />
+        <ThemeProvider>{children}</ThemeProvider>
       </body>
     </html>
   );
