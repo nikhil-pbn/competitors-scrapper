@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const summary = await appendRecords(
+    const { addedUrls, ...summary } = await appendRecords(
       parsed.data.worksheet,
       parsed.data.records,
     );
@@ -56,6 +56,7 @@ export async function POST(request: NextRequest) {
         added: summary.added,
         updated: summary.updated,
         unchanged: summary.unchanged,
+        addedUrls,
       });
     } catch {
       // ignore audit failures

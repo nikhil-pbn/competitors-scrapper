@@ -27,7 +27,7 @@ async function readHeaderRow(worksheet: string): Promise<string[]> {
 export async function appendRecords(
   worksheet: string,
   records: BusinessRecord[],
-): Promise<AppendSummary> {
+): Promise<AppendSummary & { addedUrls: string[] }> {
   const received = records.length;
   const header = await readHeaderRow(worksheet);
 
@@ -82,5 +82,6 @@ export async function appendRecords(
     unchanged: plan.unchanged,
     skippedDuplicates: plan.skippedDuplicates,
     received,
+    addedUrls: plan.addedUrls,
   };
 }

@@ -40,6 +40,8 @@ export function columnLetter(index: number): string {
 export interface UpsertPlan {
   /** Values for rows to append (in the sheet's column order). */
   newRows: string[][];
+  /** source_url of each newly-added row (for later targeted deletion). */
+  addedUrls: string[];
   /** Existing rows to overwrite, with their 1-based sheet row number. */
   updates: { rowNumber: number; values: string[] }[];
   added: number;
@@ -82,6 +84,7 @@ export function planUpsert(
 
   const seen = new Set<string>();
   const newRows: string[][] = [];
+  const addedUrls: string[] = [];
   const updates: { rowNumber: number; values: string[] }[] = [];
   let updated = 0;
   let unchanged = 0;
@@ -126,11 +129,13 @@ export function planUpsert(
       newRows.push(
         columnField.map((field) => (field ? String(record[field] ?? "") : "")),
       );
+      addedUrls.push(record.source_url);
     }
   }
 
   return {
     newRows,
+    addedUrls,
     updates,
     added: newRows.length,
     updated,

@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 
 import { isCurrentUserAdmin } from "@/lib/auth/current-user";
 import { clearAudit, deleteEntry } from "@/lib/audit/store";
+import { deleteRowsByUrls } from "@/lib/sheets/delete";
 
 export const dynamic = "force-dynamic";
 
@@ -30,8 +31,22 @@ export async function POST(request: NextRequest) {
   }
 
   if (typeof body.id === "string" && body.id.trim() !== "") {
-    await deleteEntry(body.id);
-    return NextResponse.json({ ok: true });
+    const removed = await deleteEntry(body.id);
+
+    // Also remove exactly the rows this save added, from its worksheet tab.
+    let removedRows = 0;
+    if (removed?.worksheet && removed.addedUrls && removed.addedUrls.length > 0) {
+      try {
+        removedRows = await deleteRowsByUrls(
+          removed.worksheet,
+          removed.addedUrls,
+        );
+      } catch {
+        // Log entry is already gone; surface partial success to the client.
+        return NextResponse.json({ ok: true, removedRows: 0, sheetError: true });
+      }
+    }
+    return NextResponse.json({ ok: true, removedRows });
   }
 
   return NextResponse.json({ error: "Nothing to delete." }, { status: 400 });

@@ -122,7 +122,11 @@ export default async function AdminPage() {
                     {e.unchanged}
                   </TableCell>
                   <TableCell className="text-right">
-                    <DeleteEntryButton entryKey={e.id || e.timestamp} />
+                    <DeleteEntryButton
+                      entryKey={e.id || e.timestamp}
+                      worksheet={e.worksheet}
+                      rows={e.addedUrls?.length ?? 0}
+                    />
                   </TableCell>
                 </TableRow>
               ))

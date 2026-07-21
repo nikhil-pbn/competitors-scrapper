@@ -19,6 +19,8 @@ export interface AuditEntry {
   added: number;
   updated: number;
   unchanged: number;
+  /** source_url of each row this save added — used to delete them later. */
+  addedUrls?: string[];
 }
 
 const FILE = "audit.json";
@@ -74,12 +76,18 @@ export async function logSave(
   await writeAll([full, ...current].slice(0, MAX_ENTRIES));
 }
 
-/** Delete one entry by id (falls back to matching timestamp for older rows). */
-export async function deleteEntry(key: string): Promise<void> {
-  if (!auditConfigured() || !key) return;
+/**
+ * Delete one entry by id (falls back to timestamp for older rows) and return
+ * the removed entry, so the caller can also remove its rows from the worksheet.
+ */
+export async function deleteEntry(key: string): Promise<AuditEntry | null> {
+  if (!auditConfigured() || !key) return null;
   const current = await readAuditLog(MAX_ENTRIES);
+  const removed =
+    current.find((e) => e.id === key || e.timestamp === key) ?? null;
   const next = current.filter((e) => e.id !== key && e.timestamp !== key);
   if (next.length !== current.length) await writeAll(next);
+  return removed;
 }
 
 /** Remove every entry (writes an empty file). */
