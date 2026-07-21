@@ -2,6 +2,8 @@ import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 
 import { appendRecords } from "@/lib/sheets/append";
+import { logSave } from "@/lib/audit/store";
+import { getCurrentUser } from "@/lib/auth/current-user";
 
 export const dynamic = "force-dynamic";
 
@@ -43,6 +45,23 @@ export async function POST(request: NextRequest) {
       parsed.data.worksheet,
       parsed.data.records,
     );
+
+    // Best-effort audit — never let a logging hiccup fail the save.
+    try {
+      const user = (await getCurrentUser()) ?? "unknown";
+      await logSave({
+        timestamp: new Date().toISOString(),
+        user,
+        worksheet: parsed.data.worksheet,
+        received: summary.received,
+        added: summary.added,
+        updated: summary.updated,
+        unchanged: summary.unchanged,
+      });
+    } catch {
+      // ignore audit failures
+    }
+
     return NextResponse.json({ summary });
   } catch (error) {
     const message =

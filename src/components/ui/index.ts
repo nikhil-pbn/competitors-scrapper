@@ -6,5 +6,6 @@ export * from "@/components/ui/select";
 export * from "@/components/ui/skeleton";
 export * from "@/components/ui/spinner";
 export * from "@/components/ui/separator";
+export * from "@/components/ui/table";
 // Project wrapper over shadcn's Field primitives (label + hint API).
 export { Field } from "@/components/ui/labeled-field";

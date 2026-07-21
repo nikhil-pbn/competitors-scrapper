@@ -1,7 +1,13 @@
+import Link from "next/link";
+
 import { Dashboard } from "@/features/dashboard";
 import { ThemeToggle } from "@/components/theme";
+import { LogoutButton } from "@/components/auth";
+import { Button } from "@/components/ui";
+import { isCurrentUserAdmin } from "@/lib/auth/current-user";
 
-export default function Home() {
+export default async function Home() {
+  const admin = await isCurrentUserAdmin();
   return (
     <div className="flex flex-1 flex-col">
       <header className="border-b border-border bg-card">
@@ -19,7 +25,19 @@ export default function Home() {
               </p>
             </div>
           </div>
-          <ThemeToggle />
+          <div className="flex items-center gap-2">
+            {admin ? (
+              <Button
+                asChild
+                variant="secondary"
+                className="h-8 px-2.5 text-xs"
+              >
+                <Link href="/admin">Admin</Link>
+              </Button>
+            ) : null}
+            <LogoutButton />
+            <ThemeToggle />
+          </div>
         </div>
       </header>
       <main className="mx-auto w-full flex-1 px-6 py-8">
