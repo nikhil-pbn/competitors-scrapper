@@ -6,8 +6,8 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui";
 
 /**
- * Admin table controls: manual refresh, a JSON export, and an automatic
- * refresh roughly hourly so a left-open tab stays current.
+ * Admin table controls: manual refresh, JSON export, clear-all, and an
+ * automatic refresh roughly hourly so a left-open tab stays current.
  */
 export function AdminTools({ entries }: { entries: unknown[] }) {
   const router = useRouter();
@@ -29,6 +29,22 @@ export function AdminTools({ entries }: { entries: unknown[] }) {
     URL.revokeObjectURL(url);
   }
 
+  async function clearAll() {
+    if (
+      !window.confirm(
+        "Delete ALL audit entries? This clears audit.json and can't be undone.",
+      )
+    ) {
+      return;
+    }
+    await fetch("/api/admin/audit", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ all: true }),
+    });
+    router.refresh();
+  }
+
   return (
     <div className="flex items-center gap-2">
       <Button
@@ -45,6 +61,14 @@ export function AdminTools({ entries }: { entries: unknown[] }) {
         className="h-8 px-2.5 text-xs"
       >
         Download JSON
+      </Button>
+      <Button
+        variant="destructive"
+        onClick={clearAll}
+        disabled={entries.length === 0}
+        className="h-8 px-2.5 text-xs"
+      >
+        Clear all
       </Button>
     </div>
   );

@@ -11,7 +11,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui";
-import { AdminTools } from "@/components/admin";
+import { AdminTools, DeleteEntryButton } from "@/components/admin";
 
 export const dynamic = "force-dynamic";
 
@@ -88,13 +88,14 @@ export default async function AdminPage() {
               <TableHead className="text-right">Added</TableHead>
               <TableHead className="text-right">Updated</TableHead>
               <TableHead className="text-right">Unchanged</TableHead>
+              <TableHead className="text-right">Delete</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {entries.length === 0 ? (
               <TableRow>
                 <TableCell
-                  colSpan={7}
+                  colSpan={8}
                   className="py-8 text-center text-muted-foreground"
                 >
                   No saves recorded yet.
@@ -119,6 +120,9 @@ export default async function AdminPage() {
                   </TableCell>
                   <TableCell className="text-right tabular-nums">
                     {e.unchanged}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <DeleteEntryButton entryKey={e.id || e.timestamp} />
                   </TableCell>
                 </TableRow>
               ))

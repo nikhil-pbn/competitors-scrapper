@@ -1,16 +1,17 @@
 import "server-only";
 
+import { randomUUID } from "node:crypto";
 import { get, put } from "@vercel/blob";
 
 /*
  * Save-event audit log kept as ONE JSON file — "audit.json" — in a PRIVATE
- * Vercel Blob store (NOT in the Google Sheet, and not publicly reachable). On
- * each successful save we read the file, prepend the new entry, and overwrite
- * it. /admin reads the same file back. If no Blob store is connected, this
- * degrades gracefully (logging is a no-op and the admin table shows empty).
+ * Vercel Blob store (not in the Google Sheet, not publicly reachable). Each
+ * save prepends an entry; admin deletes rewrite the same file. Degrades
+ * gracefully to empty/no-op when no Blob store is connected.
  */
 
 export interface AuditEntry {
+  id: string;
   timestamp: string;
   user: string;
   worksheet: string;
@@ -29,14 +30,21 @@ function istTimestamp(): string {
   return ist.toISOString().replace("Z", "+05:30");
 }
 
-/**
- * Connected when the Blob credentials are present. On Vercel a connected store
- * injects BLOB_READ_WRITE_TOKEN (or a store id used with the OIDC token).
- */
+/** Connected when Blob credentials are present (token, or store id + OIDC on Vercel). */
 export function auditConfigured(): boolean {
   return Boolean(
     process.env.BLOB_READ_WRITE_TOKEN || process.env.BLOB_STORE_ID,
   );
+}
+
+/** Overwrite the whole audit file. */
+async function writeAll(entries: AuditEntry[]): Promise<void> {
+  await put(FILE, JSON.stringify(entries, null, 2), {
+    access: "private",
+    addRandomSuffix: false,
+    allowOverwrite: true,
+    contentType: "application/json",
+  });
 }
 
 /** Read the audit file, newest first. Empty when unconfigured / not yet created. */
@@ -52,18 +60,30 @@ export async function readAuditLog(limit = 1000): Promise<AuditEntry[]> {
   }
 }
 
-/** Prepend one save event (timestamp stamped here, in IST) and overwrite audit.json. */
+/** Prepend one save event (id + IST timestamp stamped here) and overwrite the file. */
 export async function logSave(
-  entry: Omit<AuditEntry, "timestamp">,
+  entry: Omit<AuditEntry, "id" | "timestamp">,
 ): Promise<void> {
   if (!auditConfigured()) return;
   const current = await readAuditLog(MAX_ENTRIES);
-  const full: AuditEntry = { timestamp: istTimestamp(), ...entry };
-  const next = [full, ...current].slice(0, MAX_ENTRIES);
-  await put(FILE, JSON.stringify(next, null, 2), {
-    access: "private",
-    addRandomSuffix: false,
-    allowOverwrite: true,
-    contentType: "application/json",
-  });
+  const full: AuditEntry = {
+    id: randomUUID(),
+    timestamp: istTimestamp(),
+    ...entry,
+  };
+  await writeAll([full, ...current].slice(0, MAX_ENTRIES));
+}
+
+/** Delete one entry by id (falls back to matching timestamp for older rows). */
+export async function deleteEntry(key: string): Promise<void> {
+  if (!auditConfigured() || !key) return;
+  const current = await readAuditLog(MAX_ENTRIES);
+  const next = current.filter((e) => e.id !== key && e.timestamp !== key);
+  if (next.length !== current.length) await writeAll(next);
+}
+
+/** Remove every entry (writes an empty file). */
+export async function clearAudit(): Promise<void> {
+  if (!auditConfigured()) return;
+  await writeAll([]);
 }
