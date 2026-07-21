@@ -23,6 +23,12 @@ export interface AuditEntry {
 const FILE = "audit.json";
 const MAX_ENTRIES = 2000;
 
+/** Current time as an ISO string in IST (Asia/Kolkata is a fixed +05:30, no DST). */
+function istTimestamp(): string {
+  const ist = new Date(Date.now() + 5.5 * 60 * 60 * 1000);
+  return ist.toISOString().replace("Z", "+05:30");
+}
+
 /**
  * Connected when the Blob credentials are present. On Vercel a connected store
  * injects BLOB_READ_WRITE_TOKEN (or a store id used with the OIDC token).
@@ -46,11 +52,14 @@ export async function readAuditLog(limit = 1000): Promise<AuditEntry[]> {
   }
 }
 
-/** Prepend one save event and overwrite the private audit.json. */
-export async function logSave(entry: AuditEntry): Promise<void> {
+/** Prepend one save event (timestamp stamped here, in IST) and overwrite audit.json. */
+export async function logSave(
+  entry: Omit<AuditEntry, "timestamp">,
+): Promise<void> {
   if (!auditConfigured()) return;
   const current = await readAuditLog(MAX_ENTRIES);
-  const next = [entry, ...current].slice(0, MAX_ENTRIES);
+  const full: AuditEntry = { timestamp: istTimestamp(), ...entry };
+  const next = [full, ...current].slice(0, MAX_ENTRIES);
   await put(FILE, JSON.stringify(next, null, 2), {
     access: "private",
     addRandomSuffix: false,

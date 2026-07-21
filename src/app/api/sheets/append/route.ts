@@ -50,7 +50,6 @@ export async function POST(request: NextRequest) {
     try {
       const user = (await getCurrentUser()) ?? "unknown";
       await logSave({
-        timestamp: new Date().toISOString(),
         user,
         worksheet: parsed.data.worksheet,
         received: summary.received,

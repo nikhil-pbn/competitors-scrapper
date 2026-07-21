@@ -17,9 +17,13 @@ export const dynamic = "force-dynamic";
 
 function formatTimestamp(iso: string): string {
   const d = new Date(iso);
-  return Number.isNaN(d.getTime())
-    ? iso
-    : d.toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" });
+  if (Number.isNaN(d.getTime())) return iso;
+  const formatted = d.toLocaleString("en-IN", {
+    dateStyle: "medium",
+    timeStyle: "short",
+    timeZone: "Asia/Kolkata",
+  });
+  return `${formatted} IST`;
 }
 
 export default async function AdminPage() {
