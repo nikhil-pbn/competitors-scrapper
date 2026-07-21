@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 
 import type { NoDataItem } from "@/features/dashboard/selectors";
 
@@ -11,12 +12,17 @@ import type { NoDataItem } from "@/features/dashboard/selectors";
  */
 export function NoDataNotice({
   items,
+  worksheet,
   onInclude,
 }: {
   items: NoDataItem[];
+  worksheet: string;
   onInclude: (key: string) => void;
 }) {
   const [copied, setCopied] = useState(false);
+  const [saveState, setSaveState] = useState<"idle" | "saving" | "saved">(
+    "idle",
+  );
 
   if (items.length === 0) return null;
 
@@ -32,6 +38,26 @@ export function NoDataNotice({
     }
   }
 
+  // Persist these URLs (tagged with the competitor) to the /nodata research list.
+  async function saveForResearch() {
+    if (saveState === "saving" || !worksheet) return;
+    setSaveState("saving");
+    try {
+      const res = await fetch("/api/research/nodata", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "add",
+          worksheet,
+          urls: items.map((i) => i.display),
+        }),
+      });
+      setSaveState(res.ok ? "saved" : "idle");
+    } catch {
+      setSaveState("idle");
+    }
+  }
+
   return (
     <div className="mb-4 rounded-md border border-amber-300 bg-amber-50 px-3 py-2.5 text-xs text-amber-700 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-300">
       <div className="mb-2 flex items-start justify-between gap-3">
@@ -39,13 +65,37 @@ export function NoDataNotice({
           {items.length} site{items.length > 1 ? "s" : ""} with no / low contact
           details (excluded from save) — click ＋ to add one back to the table:
         </p>
-        <button
-          type="button"
-          onClick={copyUrls}
-          className="shrink-0 rounded border border-amber-400 px-2 py-1 text-[11px] font-medium hover:bg-amber-100 dark:border-amber-700 dark:hover:bg-amber-900/40"
-        >
-          {copied ? "Copied!" : "Copy URLs"}
-        </button>
+        <div className="flex shrink-0 gap-2">
+          <button
+            type="button"
+            onClick={saveForResearch}
+            disabled={saveState === "saving"}
+            title="Save these URLs to the /nodata research list"
+            className="rounded border border-amber-400 px-2 py-1 text-[11px] font-medium hover:bg-amber-100 disabled:opacity-60 dark:border-amber-700 dark:hover:bg-amber-900/40"
+          >
+            {saveState === "saved"
+              ? "Saved ✓"
+              : saveState === "saving"
+                ? "Saving…"
+                : "Save for research"}
+          </button>
+          <button
+            type="button"
+            onClick={copyUrls}
+            className="rounded border border-amber-400 px-2 py-1 text-[11px] font-medium hover:bg-amber-100 dark:border-amber-700 dark:hover:bg-amber-900/40"
+          >
+            {copied ? "Copied!" : "Copy URLs"}
+          </button>
+          <Link
+            href="/nodata"
+            target="_blank"
+            rel="noopener noreferrer"
+            title="Open the full no-data research list in a new tab"
+            className="rounded border border-amber-400 px-2 py-1 text-[11px] font-medium hover:bg-amber-100 dark:border-amber-700 dark:hover:bg-amber-900/40"
+          >
+            View all no-data URLs ↗
+          </Link>
+        </div>
       </div>
       <div className="flex flex-wrap gap-1.5">
         {items.map((item) => (

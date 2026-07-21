@@ -16,3 +16,15 @@ export function formatDate(value: unknown): string {
 export function stripProtocol(url: string): string {
   return url.replace(/^https?:\/\//, "");
 }
+
+/** Format an ISO timestamp as a readable IST date-time (e.g. "21 Jul 2026, 1:24 pm IST"). */
+export function formatIst(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  const formatted = d.toLocaleString("en-IN", {
+    dateStyle: "medium",
+    timeStyle: "short",
+    timeZone: "Asia/Kolkata",
+  });
+  return `${formatted} IST`;
+}

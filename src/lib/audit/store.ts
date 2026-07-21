@@ -3,6 +3,8 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 import { get, put } from "@vercel/blob";
 
+import { readStreamJson } from "@/lib/blob-json";
+
 /*
  * Save-event audit log kept as ONE JSON file — "audit.json" — in a PRIVATE
  * Vercel Blob store (not in the Google Sheet, not publicly reachable). Each
@@ -55,7 +57,7 @@ export async function readAuditLog(limit = 1000): Promise<AuditEntry[]> {
   try {
     const result = await get(FILE, { access: "private", useCache: false });
     if (!result || result.stream === null) return [];
-    const data = await new Response(result.stream).json();
+    const data = await readStreamJson(result.stream);
     return Array.isArray(data) ? (data as AuditEntry[]).slice(0, limit) : [];
   } catch {
     return [];

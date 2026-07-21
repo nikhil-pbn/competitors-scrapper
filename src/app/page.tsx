@@ -26,6 +26,9 @@ export default async function Home() {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <Button asChild variant="secondary" className="h-8 px-2.5 text-xs">
+              <Link href="/nodata">No-data URLs</Link>
+            </Button>
             {admin ? (
               <Button
                 asChild

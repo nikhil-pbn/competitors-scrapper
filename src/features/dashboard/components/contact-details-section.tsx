@@ -92,6 +92,7 @@ export function ContactDetailsSection(props: ContactDetailsSectionProps) {
 
       <NoDataNotice
         items={props.noDataItems}
+        worksheet={worksheet}
         onInclude={props.onIncludeFromNoData}
       />
 
