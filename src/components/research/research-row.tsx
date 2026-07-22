@@ -2,15 +2,7 @@
 
 import { useState } from "react";
 
-import {
-  Button,
-  Input,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui";
+import { Button, Input } from "@/components/ui";
 import { stripProtocol } from "@/lib/format";
 
 export interface RowData {
@@ -46,14 +38,15 @@ const jsonPost = (body: unknown) =>
     body: JSON.stringify(body),
   });
 
-/** One editable no-data row: fill details, save, or push into a chosen tab. */
+/**
+ * One editable no-data row. Details are filled in manually; "Add to sheet"
+ * always pushes to the row's own origin tab (never a different one).
+ */
 export function ResearchRow({
   record,
-  worksheets,
   onRemove,
 }: {
   record: RowData;
-  worksheets: string[];
   onRemove: (id: string) => void;
 }) {
   const [fields, setFields] = useState<Fields>({
@@ -65,7 +58,6 @@ export function ResearchRow({
     location: record.location,
     State: record.State,
   });
-  const [tab, setTab] = useState(record.worksheet || worksheets[0] || "");
   const [busy, setBusy] = useState<"" | "save" | "add" | "delete">("");
 
   const set = (k: keyof Fields, v: string) =>
@@ -81,14 +73,14 @@ export function ResearchRow({
   }
 
   async function addToSheet() {
-    if (!tab) return;
+    if (!record.worksheet) return;
     setBusy("add");
     try {
       const res = await fetch("/api/sheets/append", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          worksheet: tab,
+          worksheet: record.worksheet,
           records: [{ ...fields, source_url: record.source_url }],
         }),
       });
@@ -122,7 +114,7 @@ export function ResearchRow({
     : `https://${record.source_url}`;
 
   return (
-    <tr className="border-b border-border align-top last:border-0">
+    <tr className="border-b border-border align-middle last:border-0">
       <td className="px-2 py-2">
         <a
           href={href}
@@ -146,19 +138,8 @@ export function ResearchRow({
           />
         </td>
       ))}
-      <td className="px-1 py-1">
-        <Select value={tab || undefined} onValueChange={setTab}>
-          <SelectTrigger className="h-8 w-36">
-            <SelectValue placeholder="Tab" />
-          </SelectTrigger>
-          <SelectContent>
-            {worksheets.map((w) => (
-              <SelectItem key={w} value={w}>
-                {w}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+      <td className="px-2 py-1 text-xs font-medium whitespace-nowrap">
+        {record.worksheet}
       </td>
       <td className="px-2 py-1 whitespace-nowrap">
         <div className="flex gap-1">
@@ -172,7 +153,7 @@ export function ResearchRow({
           </Button>
           <Button
             onClick={addToSheet}
-            disabled={busy !== "" || !tab}
+            disabled={busy !== "" || !record.worksheet}
             className="h-8 px-2 text-xs"
           >
             {busy === "add" ? "…" : "Add to sheet"}
