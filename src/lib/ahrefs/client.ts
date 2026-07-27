@@ -68,7 +68,10 @@ export async function fetchReferringDomains(
 
   const params = new URLSearchParams({
     target,
-    mode: "domain",
+    // "subdomains" covers the domain AND its subdomains (Ahrefs' recommended
+    // mode for a bare domain target). "domain" analyzes ONLY the exact domain,
+    // which under-/over-counts vs. the web UI.
+    mode: "subdomains",
     protocol: "both",
     select: SELECT_COLUMNS,
     order_by: "domain_rating:desc",

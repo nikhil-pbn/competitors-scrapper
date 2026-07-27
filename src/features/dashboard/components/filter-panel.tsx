@@ -77,6 +77,15 @@ export function FilterPanel({
         ? LOST_LINK_STATUSES
         : [];
 
+  // The range drives `first_seen` (New) / `last_seen` (Lost). "All" lists every
+  // current referring domain, so the range doesn't filter it (as in Ahrefs).
+  const rangeHint =
+    status === "new"
+      ? "domains first seen in this window"
+      : status === "lost"
+        ? "domains lost in this window"
+        : "only applies to New / Lost";
+
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
       <Field label="Domain contains" hint="e.g. dent">
@@ -141,7 +150,7 @@ export function FilterPanel({
         />
       </Field>
 
-      <Field label="Date range" hint="links first seen within this period">
+      <Field label="Date range" hint={rangeHint}>
         <Select
           value={filters.range ?? "last_month"}
           disabled={disabled}

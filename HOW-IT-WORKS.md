@@ -179,15 +179,26 @@ Search is enabled when ≥1 selected competitor has a known domain.
   linkStatus?, range?, limit? }`.
 - Calls **`lib/ahrefs/client.ts → fetchReferringDomains()`**, which:
   - Builds the query for `GET https://api.ahrefs.com/v3/site-explorer/refdomains`:
-    `target`, `mode=domain`, `protocol=both`, `select=<SELECT_COLUMNS>`,
+    `target`, `mode=subdomains`, `protocol=both`, `select=<SELECT_COLUMNS>`,
     `order_by=domain_rating:desc`, `limit`, `history`, `output=json`.
-  - `history` comes from **`lib/ahrefs/filters.ts → buildHistory()`** — the date
-    range: `range` → `sinceDateFor()` → `since:YYYY-MM-DD`, or `"live"` for
-    "All time".
+    **`mode=subdomains` is required for a bare domain target** — `mode=domain`
+    excludes `www` and other subdomains and does not match the web UI.
+  - `history` comes from **`lib/ahrefs/filters.ts → buildHistory()`**: `"live"`
+    for All/New (the current snapshot), and `since:YYYY-MM-DD` / `all_time` for
+    Lost (so lost rows are included in the report).
   - `where` comes from **`buildWhere()`** — a JSON boolean expression:
-    `domainKeyword` → `isubstring` on `domain`; `status="new"` → `new_links>0`,
-    `"lost"` → `lost_links>0`. (`linkStatus` is UI-only; the refdomains endpoint
-    has no matching column.)
+    - `domainKeyword` → `isubstring` on `domain`.
+    - `status="new"` → **`first_seen >= sinceDateFor(range)`** (a referring
+      domain is "new" when its FIRST link appeared in the window — *not*
+      `new_links>0`, which also matches old domains that merely gained another
+      link, the bug that returned 72 rows where Ahrefs showed 10).
+    - `status="lost"` → `last_seen >= sinceDateFor(range)` (or `lost_links>0`
+      for "All time").
+    - `status="all"` → no date/status condition; lists every current referring
+      domain, so the date range does not filter it (matches the Ahrefs "All" tab).
+    - `linkStatus` (New only) → `discovered_status` = `pagefound`
+      (Newly published) / `linkfound` (Link added) / `linkrestored`
+      (Link restored).
   - `Authorization: Bearer ${AHREFS_API_KEY}`, `cache: "no-store"`.
   - Maps each raw row (`toReferringDomain`) to the clean `ReferringDomain` model
     and dedupes by domain.

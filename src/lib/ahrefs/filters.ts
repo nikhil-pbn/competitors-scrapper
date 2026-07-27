@@ -1,16 +1,25 @@
-import type { AhrefsFilters, RefdomainRange } from "@/lib/ahrefs/types";
+import type {
+  AhrefsFilters,
+  RefdomainLinkStatus,
+  RefdomainRange,
+} from "@/lib/ahrefs/types";
 
 /**
- * Ahrefs API v3 filter/`where` builder.
+ * Ahrefs API v3 refdomains filter/`where` + `history` builder.
  *
- * The `where` parameter is a JSON boolean expression:
+ * `where` is a JSON boolean expression:
  *   {"and":[{"field":"<col>","is":["<op>",<value>]}, ...]}
- * Operators: eq, neq, gt, gte, lt, lte, substring, isubstring, prefix, suffix.
+ * Operators: eq, neq, gt, gte, lt, lte, substring, isubstring, prefix, suffix…
  *
- * NOTE on field identifiers: the `where` parameter recognizes different column
- * identifiers than `select`. The names below reflect the documented refdomains
- * columns; if the live API rejects one, confirm the exact identifier by building
- * the filter visually on ahrefs.com and pressing the "API {}" button.
+ * Semantics (verified against the API v3 spec + the web UI):
+ *  - A "New" referring domain is one whose FIRST link appeared in the window,
+ *    i.e. `first_seen >= <since>` — NOT `new_links > 0` (which also matches old
+ *    domains that merely gained another link).
+ *  - A "Lost" referring domain lost its last live link in the window, i.e.
+ *    `last_seen >= <since>`, and needs `history` set (not "live") so lost rows
+ *    are included in the report.
+ *  - "All" lists every current referring domain; the date range does not filter
+ *    it (matching the Ahrefs "All" tab).
  */
 
 type Condition = { field: string; is: [string, ...unknown[]] };
@@ -52,6 +61,20 @@ export function sinceDateFor(
   return d.toISOString().slice(0, 10);
 }
 
+/** Map the "Link status" sub-filter to the `discovered_status` column (New only). */
+function discoveredStatusFor(linkStatus?: RefdomainLinkStatus): string | null {
+  switch (linkStatus) {
+    case "newly_published":
+      return "pagefound";
+    case "link_added":
+      return "linkfound";
+    case "link_restored":
+      return "linkrestored";
+    default:
+      return null;
+  }
+}
+
 /**
  * Build the `where` JSON expression from UI filters. Returns undefined when no
  * conditions apply (so the query param can be omitted entirely).
@@ -59,34 +82,44 @@ export function sinceDateFor(
 export function buildWhere(filters: AhrefsFilters): string | undefined {
   const conditions: Condition[] = [];
 
-  if (filters.domainKeyword?.trim()) {
-    // Case-insensitive substring match on the referring domain name.
-    conditions.push({
-      field: "domain",
-      is: ["isubstring", filters.domainKeyword.trim()],
-    });
+  const keyword = filters.domainKeyword?.trim();
+  if (keyword) {
+    conditions.push({ field: "domain", is: ["isubstring", keyword] });
   }
 
-  // Status: "new" -> domains with newly discovered links, "lost" -> lost links.
-  // "all" (default) adds no status condition.
-  //
-  // NOTE: the sub-status (filters.linkStatus: newly_published / link_added /
-  // link_restored / …) has no corresponding column in the refdomains API, so it
-  // is a UI-level selection only and is not translated into a `where` clause
-  // here. Confirm the exact query via ahrefs.com's "API {}" button if refdomains
-  // gains support for it.
-  if (filters.status === "new") {
-    conditions.push({ field: "new_links", is: ["gt", 0] });
-  } else if (filters.status === "lost") {
-    conditions.push({ field: "lost_links", is: ["gt", 0] });
+  const status = filters.status ?? "all";
+  const since = sinceDateFor(filters.range ?? "last_month");
+
+  if (status === "new") {
+    // Referring domains first seen within the window.
+    if (since) conditions.push({ field: "first_seen", is: ["gte", since] });
+    // Optional link-status refinement (how the link was discovered).
+    const discovered = discoveredStatusFor(filters.linkStatus);
+    if (discovered) {
+      conditions.push({ field: "discovered_status", is: ["eq", discovered] });
+    }
+  } else if (status === "lost") {
+    // Referring domains whose last live link was lost within the window.
+    if (since) {
+      conditions.push({ field: "last_seen", is: ["gte", since] });
+    } else {
+      conditions.push({ field: "lost_links", is: ["gt", 0] });
+    }
   }
+  // "all": no date/status condition — every current referring domain.
 
   if (conditions.length === 0) return undefined;
   return JSON.stringify({ and: conditions });
 }
 
-/** The `history` value for the request, based on the selected date range. */
+/**
+ * The `history` value. "Lost" needs history (so lost rows are included);
+ * "All"/"New" use the live snapshot (New is narrowed by first_seen in `where`).
+ */
 export function buildHistory(filters: AhrefsFilters): string {
-  const since = sinceDateFor(filters.range ?? "last_month");
-  return since ? `since:${since}` : "live";
+  if ((filters.status ?? "all") === "lost") {
+    const since = sinceDateFor(filters.range ?? "last_month");
+    return since ? `since:${since}` : "all_time";
+  }
+  return "live";
 }
