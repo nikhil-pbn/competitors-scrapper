@@ -4,57 +4,50 @@ import type { AppendSummary } from "@/lib/types";
 import { Spinner } from "@/components/ui";
 import type { Phase } from "@/features/dashboard/pipeline";
 
-/** Save-flow feedback shown next to the Save button (loading + success). */
+/** Save-flow feedback shown next to the Save button (loading + per-tab success). */
 export function SaveStatus({
   phase,
-  worksheet,
-  summary,
+  summaries,
 }: {
   phase: Phase;
-  worksheet: string;
-  summary: AppendSummary | null;
+  summaries: AppendSummary[];
 }) {
   if (phase === "saving") {
     return (
       <div className="mb-4 flex items-center gap-3 rounded-lg border border-border bg-card px-4 py-3 text-sm">
         <Spinner />
-        <span>
-          Saving to <span className="font-medium">{worksheet}</span>…
-        </span>
+        <span>Saving to competitor tabs…</span>
       </div>
     );
   }
 
-  if (phase === "saved" && summary) {
+  if (phase === "saved" && summaries.length > 0) {
+    const totalAdded = summaries.reduce((n, s) => n + s.added, 0);
+    const totalUpdated = summaries.reduce((n, s) => n + s.updated, 0);
+
     return (
-      <div className="save-pop mb-4 flex items-center gap-4 rounded-lg border border-green-300 bg-linear-to-r from-green-50 to-emerald-50 px-4 py-4 dark:border-green-900 dark:from-green-950/50 dark:to-emerald-950/40">
+      <div className="save-pop mb-4 flex items-start gap-4 rounded-lg border border-green-300 bg-linear-to-r from-green-50 to-emerald-50 px-4 py-4 dark:border-green-900 dark:from-green-950/50 dark:to-emerald-950/40">
         <SuccessCheck />
         <div className="text-sm">
           <p className="font-semibold text-green-800 dark:text-green-300">
-            Saved to “{summary.worksheet}”
+            Saved to {summaries.length} tab
+            {summaries.length === 1 ? "" : "s"} · {totalAdded} added ·{" "}
+            {totalUpdated} updated
           </p>
-          <p className="text-green-700/90 dark:text-green-400/90">
-            <span className="font-medium">{summary.added}</span> added
-            {" · "}
-            <span className="font-medium">{summary.updated}</span> updated
-            {summary.unchanged > 0 ? (
-              <>
-                {" · "}
-                <span className="font-medium">{summary.unchanged}</span>{" "}
-                unchanged
-              </>
-            ) : null}
-            {summary.skippedDuplicates > 0 ? (
-              <>
-                {" · "}
-                <span className="font-medium">
-                  {summary.skippedDuplicates}
-                </span>{" "}
-                duplicate
-                {summary.skippedDuplicates === 1 ? "" : "s"} skipped
-              </>
-            ) : null}
-          </p>
+          <ul className="mt-1 space-y-0.5 text-green-700/90 dark:text-green-400/90">
+            {summaries.map((s) => (
+              <li key={s.worksheet}>
+                <span className="font-medium">{s.worksheet}</span>: {s.added}{" "}
+                added · {s.updated} updated
+                {s.unchanged > 0 ? ` · ${s.unchanged} unchanged` : ""}
+                {s.skippedDuplicates > 0
+                  ? ` · ${s.skippedDuplicates} dup${
+                      s.skippedDuplicates === 1 ? "" : "s"
+                    } skipped`
+                  : ""}
+              </li>
+            ))}
+          </ul>
         </div>
       </div>
     );

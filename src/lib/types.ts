@@ -39,6 +39,8 @@ export interface ReferringDomain {
   lastSeen: string | null;
   /** Count of newly discovered links from this domain in the period. */
   newLinks: number | null;
+  /** Which competitor (worksheet tab) this domain was fetched for. */
+  competitor?: string;
 }
 
 /**
@@ -60,6 +62,13 @@ export interface BusinessRecord {
   State: string;
   /** The referring domain / page the record was extracted from. */
   source_url: string;
+  /**
+   * Which competitor (worksheet tab) this record belongs to — decides the tab
+   * it saves to. Metadata only: not in BUSINESS_RECORD_FIELDS, so it is never
+   * written as a sheet column (and is stripped at the /api/sheets/append
+   * boundary).
+   */
+  competitor?: string;
 }
 
 /** The canonical column keys written to Google Sheets, in preferred order. */

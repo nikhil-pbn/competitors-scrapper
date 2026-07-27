@@ -1,78 +1,42 @@
 "use client";
 
-import {
-  Field,
-  Input,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui";
+import { Field, MultiSelect } from "@/components/ui";
 
-/** Competitor/worksheet picker + the (auto-filled, editable) competitor domain. */
+/**
+ * Multi-select competitor picker. Search runs Ahrefs once per selected
+ * competitor; their target domains are derived from the built-in list.
+ */
 export function CompetitorFields({
   worksheets,
   worksheetsError,
-  worksheet,
-  onSelectWorksheet,
-  target,
-  onTargetChange,
+  selected,
+  onChange,
   busy,
-  onSearch,
 }: {
   worksheets: string[];
   worksheetsError: string | null;
-  worksheet: string;
-  onSelectWorksheet: (name: string) => void;
-  target: string;
-  onTargetChange: (value: string) => void;
+  selected: string[];
+  onChange: (next: string[]) => void;
   busy: boolean;
-  onSearch: () => void;
 }) {
   return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-      <Field
-        label="Competitor / worksheet"
-        hint="required — target worksheet for Search, Upload & URLs"
-      >
-        {worksheetsError ? (
-          <span className="text-xs text-red-500">{worksheetsError}</span>
-        ) : (
-          <Select
-            value={worksheet || undefined}
-            onValueChange={onSelectWorksheet}
-            disabled={busy || worksheets.length === 0}
-          >
-            <SelectTrigger className="w-full">
-              <SelectValue
-                placeholder={
-                  worksheets.length === 0 ? "Loading…" : "Select competitor…"
-                }
-              />
-            </SelectTrigger>
-            <SelectContent>
-              {worksheets.map((w) => (
-                <SelectItem key={w} value={w}>
-                  {w}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        )}
-      </Field>
-
-      <Field label="Competitor domain" hint="e.g. adit.com">
-        <Input
-          value={target}
-          placeholder="competitor.com"
+    <Field
+      label="Competitors"
+      hint="required — pick one or more; Search runs Ahrefs for each"
+    >
+      {worksheetsError ? (
+        <span className="text-xs text-red-500">{worksheetsError}</span>
+      ) : worksheets.length === 0 ? (
+        <span className="text-xs text-muted-foreground">Loading…</span>
+      ) : (
+        <MultiSelect
+          options={worksheets}
+          selected={selected}
+          onChange={onChange}
+          placeholder="Select competitors…"
           disabled={busy}
-          onChange={(e) => onTargetChange(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") onSearch();
-          }}
         />
-      </Field>
-    </div>
+      )}
+    </Field>
   );
 }

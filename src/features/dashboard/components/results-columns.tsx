@@ -14,10 +14,13 @@ export const RESULT_COLUMNS: { key: keyof BusinessRecord; header: string }[] = [
   { key: "source_url", header: "Source URL" },
 ];
 
-export const RESULT_CSV_HEADERS = RESULT_COLUMNS.map((c) => c.header);
+export const RESULT_CSV_HEADERS = [
+  "Competitor",
+  ...RESULT_COLUMNS.map((c) => c.header),
+];
 
 export function resultCsvRow(r: BusinessRecord): string[] {
-  return RESULT_COLUMNS.map((c) => String(r[c.key] ?? ""));
+  return [r.competitor ?? "", ...RESULT_COLUMNS.map((c) => String(r[c.key] ?? ""))];
 }
 
 function Checkbox(props: {
@@ -76,6 +79,20 @@ export function buildResultColumns(
     enableSorting: false,
   };
 
+  const competitorCol: ColumnDef<BusinessRecord> = {
+    id: "competitor",
+    accessorFn: (r) => r.competitor ?? "",
+    header: "Competitor",
+    cell: ({ row }) => {
+      const c = row.original.competitor;
+      return c ? (
+        <span className="font-medium whitespace-nowrap">{c}</span>
+      ) : (
+        <span className="text-muted-foreground">—</span>
+      );
+    },
+  };
+
   const dataCols: ColumnDef<BusinessRecord>[] = RESULT_COLUMNS.map((c) => ({
     id: c.key,
     accessorKey: c.key,
@@ -88,7 +105,7 @@ export function buildResultColumns(
     },
   }));
 
-  if (!onExclude) return [selectCol, ...dataCols];
+  if (!onExclude) return [selectCol, competitorCol, ...dataCols];
 
   const actionCol: ColumnDef<BusinessRecord> = {
     id: "actions",
@@ -107,5 +124,5 @@ export function buildResultColumns(
       ),
   };
 
-  return [selectCol, ...dataCols, actionCol];
+  return [selectCol, competitorCol, ...dataCols, actionCol];
 }

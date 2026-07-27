@@ -85,7 +85,9 @@ export function ReferringDomainsTable({
                   <th
                     key={header.id}
                     className={`whitespace-nowrap px-3 py-2.5 text-xs font-semibold text-muted-foreground ${
-                      header.id === "domain" ? "text-left" : "text-right"
+                      header.id === "domain" || header.id === "competitor"
+                        ? "text-left"
+                        : "text-right"
                     }`}
                   >
                     <button
@@ -116,7 +118,8 @@ export function ReferringDomainsTable({
                   <td
                     key={cell.id}
                     className={`px-3 py-2 ${
-                      cell.column.id === "domain"
+                      cell.column.id === "domain" ||
+                      cell.column.id === "competitor"
                         ? "text-left"
                         : "text-right tabular-nums"
                     }`}

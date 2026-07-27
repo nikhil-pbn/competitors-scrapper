@@ -14,6 +14,18 @@ export type RefdomainLinkStatus =
   | "link_removed"
   | "link_lost";
 
+/** Date range for "first seen" (mirrors the Ahrefs range dropdown). */
+export type RefdomainRange =
+  | "last_24h"
+  | "last_7d"
+  | "last_month"
+  | "last_3m"
+  | "last_6m"
+  | "last_year"
+  | "last_2y"
+  | "last_5y"
+  | "all";
+
 /** Phase 1 input: the search target + configurable filters. */
 export interface AhrefsFilters {
   /** Referring domain name must contain this keyword (case-insensitive), e.g. "dent". */
@@ -22,8 +34,8 @@ export interface AhrefsFilters {
   status?: RefdomainStatus;
   /** Sub-status; applies only when status is "new" or "lost". */
   linkStatus?: RefdomainLinkStatus;
-  /** Restrict to links first seen since the start of last month. */
-  sinceLastMonth?: boolean;
+  /** Restrict to links first seen within this range ("all" = no restriction). */
+  range?: RefdomainRange;
   /** Max rows to fetch from Ahrefs (default 1000). */
   limit?: number;
 }

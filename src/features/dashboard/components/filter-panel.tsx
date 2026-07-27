@@ -3,6 +3,7 @@
 import type {
   AhrefsFilters,
   RefdomainLinkStatus,
+  RefdomainRange,
   RefdomainStatus,
 } from "@/lib/ahrefs/types";
 import {
@@ -26,6 +27,18 @@ const LOST_LINK_STATUSES: { value: RefdomainLinkStatus; label: string }[] = [
   { value: "any", label: "Any" },
   { value: "link_removed", label: "Link removed" },
   { value: "link_lost", label: "Link lost" },
+];
+
+const RANGE_OPTIONS: { value: RefdomainRange; label: string }[] = [
+  { value: "last_24h", label: "Last 24 hours" },
+  { value: "last_7d", label: "Last 7 days" },
+  { value: "last_month", label: "Last month" },
+  { value: "last_3m", label: "Last 3 months" },
+  { value: "last_6m", label: "Last 6 months" },
+  { value: "last_year", label: "Last year" },
+  { value: "last_2y", label: "Last 2 years" },
+  { value: "last_5y", label: "Last 5 years" },
+  { value: "all", label: "All time" },
 ];
 
 /** The configurable Ahrefs filters (Phase 1). Pure presentational + onChange. */
@@ -128,17 +141,24 @@ export function FilterPanel({
         />
       </Field>
 
-      <div className="flex flex-col gap-2 sm:col-span-2 lg:col-span-3">
-        <label className="flex items-center gap-2 text-sm">
-          <input
-            type="checkbox"
-            checked={filters.sinceLastMonth ?? false}
-            disabled={disabled}
-            onChange={(e) => update("sinceLastMonth", e.target.checked)}
-          />
-          Last month only
-        </label>
-      </div>
+      <Field label="Date range" hint="links first seen within this period">
+        <Select
+          value={filters.range ?? "last_month"}
+          disabled={disabled}
+          onValueChange={(v) => update("range", v as RefdomainRange)}
+        >
+          <SelectTrigger className="w-full">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {RANGE_OPTIONS.map((o) => (
+              <SelectItem key={o.value} value={o.value}>
+                {o.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </Field>
     </div>
   );
 }

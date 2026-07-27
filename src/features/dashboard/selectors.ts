@@ -38,6 +38,7 @@ export function inTable(
 export interface NoDataItem {
   key: string;
   display: string;
+  competitor?: string;
 }
 
 /**
@@ -56,7 +57,11 @@ export function computeNoDataItems(
     const key = sourceKey(r.source_url);
     if (seen.has(key)) continue;
     seen.add(key);
-    out.push({ key, display: stripProtocol(r.source_url) });
+    out.push({
+      key,
+      display: stripProtocol(r.source_url),
+      competitor: r.competitor,
+    });
   }
   return out;
 }

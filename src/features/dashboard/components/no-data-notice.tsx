@@ -12,11 +12,9 @@ import type { NoDataItem } from "@/features/dashboard/selectors";
  */
 export function NoDataNotice({
   items,
-  worksheet,
   onInclude,
 }: {
   items: NoDataItem[];
-  worksheet: string;
   onInclude: (key: string) => void;
 }) {
   const [copied, setCopied] = useState(false);
@@ -38,21 +36,28 @@ export function NoDataNotice({
     }
   }
 
-  // Persist these URLs (tagged with the competitor) to the /nodata research list.
+  // Persist to the /nodata research list, grouped by each URL's competitor tab.
   async function saveForResearch() {
-    if (saveState === "saving" || !worksheet) return;
+    if (saveState === "saving") return;
+    const byCompetitor = new Map<string, string[]>();
+    for (const item of items) {
+      if (!item.competitor) continue;
+      const urls = byCompetitor.get(item.competitor) ?? [];
+      urls.push(item.display);
+      byCompetitor.set(item.competitor, urls);
+    }
+    if (byCompetitor.size === 0) return;
+
     setSaveState("saving");
     try {
-      const res = await fetch("/api/research/nodata", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "add",
-          worksheet,
-          urls: items.map((i) => i.display),
-        }),
-      });
-      setSaveState(res.ok ? "saved" : "idle");
+      for (const [worksheet, urls] of byCompetitor) {
+        await fetch("/api/research/nodata", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "add", worksheet, urls }),
+        });
+      }
+      setSaveState("saved");
     } catch {
       setSaveState("idle");
     }
@@ -104,6 +109,9 @@ export function NoDataNotice({
             className="inline-flex items-center gap-1 rounded border border-amber-300 bg-amber-100/60 py-0.5 pl-2 pr-0.5 dark:border-amber-800 dark:bg-amber-900/40"
           >
             {item.display}
+            {item.competitor ? (
+              <span className="opacity-60">· {item.competitor}</span>
+            ) : null}
             <button
               type="button"
               onClick={() => onInclude(item.key)}

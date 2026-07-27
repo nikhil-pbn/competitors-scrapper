@@ -5,22 +5,22 @@ import { useRef } from "react";
 import { Button } from "@/components/ui";
 
 /**
- * The primary data-source actions: upload a file, load sample data, or run a
- * live Ahrefs search. All are disabled until a competitor is selected.
+ * Primary data-source actions. Search works with any number of competitors;
+ * Upload / Sample need exactly one selected (they tag with that competitor).
  */
 export function SourceActions({
-  blocked,
-  noCompetitor,
   fetching,
-  canSearch,
+  searchDisabled,
+  singleDisabled,
+  hint,
   onUpload,
   onSample,
   onSearch,
 }: {
-  blocked: boolean;
-  noCompetitor: boolean;
   fetching: boolean;
-  canSearch: boolean;
+  searchDisabled: boolean;
+  singleDisabled: boolean;
+  hint: string | null;
   onUpload: (file: File) => void;
   onSample: () => void;
   onSearch: () => void;
@@ -29,9 +29,9 @@ export function SourceActions({
 
   return (
     <div className="flex flex-wrap items-center justify-end gap-3">
-      {noCompetitor ? (
+      {hint ? (
         <span className="mr-auto text-xs text-amber-600 dark:text-amber-400">
-          Select a competitor above to enable actions.
+          {hint}
         </span>
       ) : null}
       <input
@@ -42,20 +42,20 @@ export function SourceActions({
         onChange={(e) => {
           const file = e.target.files?.[0];
           if (file) onUpload(file);
-          e.target.value = ""; // allow re-uploading the same file
+          e.target.value = "";
         }}
       />
       <Button
         variant="secondary"
         onClick={() => fileInputRef.current?.click()}
-        disabled={blocked}
+        disabled={singleDisabled}
       >
         Upload CSV
       </Button>
-      <Button variant="secondary" onClick={onSample} disabled={blocked}>
+      <Button variant="secondary" onClick={onSample} disabled={singleDisabled}>
         Load sample data
       </Button>
-      <Button onClick={onSearch} disabled={blocked || !canSearch}>
+      <Button onClick={onSearch} disabled={searchDisabled}>
         {fetching ? "Fetching…" : "Search"}
       </Button>
     </div>

@@ -25,7 +25,8 @@ export interface PipelineState {
   dataSource: DataSource;
   records: BusinessRecord[];
   progress: { done: number; total: number };
-  saveSummary: AppendSummary | null;
+  /** One summary per competitor tab written in the last save. */
+  saveSummaries: AppendSummary[];
 }
 
 export const initialPipelineState: PipelineState = {
@@ -35,7 +36,7 @@ export const initialPipelineState: PipelineState = {
   dataSource: "live",
   records: [],
   progress: { done: 0, total: 0 },
-  saveSummary: null,
+  saveSummaries: [],
 };
 
 export type PipelineAction =
@@ -46,13 +47,11 @@ export type PipelineAction =
   | { type: "progress"; done: number; total: number; record: BusinessRecord }
   | { type: "analyzeDone"; records: BusinessRecord[] }
   | { type: "saveStart" }
-  | { type: "saveDone"; summary: AppendSummary }
+  | { type: "saveDone"; summaries: AppendSummary[] }
   | { type: "fail"; message: string };
 
 /**
- * Pure reducer for the Ahrefs → analyze → save pipeline. Keeping the whole
- * state machine in one pure function makes the transitions easy to reason about
- * and test, and keeps the hook (side effects) and UI (rendering) thin.
+ * Pure reducer for the Ahrefs → analyze → save pipeline.
  *
  * `sourceError` clears the whole result set (a failed/empty source load has no
  * domains to show), whereas `fail` preserves domains/records (an analyze or
@@ -70,7 +69,7 @@ export function pipelineReducer(
         ...state,
         phase: "domains",
         error: null,
-        saveSummary: null,
+        saveSummaries: [],
         records: [],
         progress: { done: 0, total: 0 },
         domains: action.domains,
@@ -95,9 +94,9 @@ export function pipelineReducer(
     case "analyzeDone":
       return { ...state, phase: "ready", records: action.records };
     case "saveStart":
-      return { ...state, phase: "saving", error: null, saveSummary: null };
+      return { ...state, phase: "saving", error: null, saveSummaries: [] };
     case "saveDone":
-      return { ...state, phase: "saved", saveSummary: action.summary };
+      return { ...state, phase: "saved", saveSummaries: action.summaries };
     case "fail":
       return { ...state, phase: "error", error: action.message };
     default:

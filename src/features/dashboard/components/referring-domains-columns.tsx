@@ -18,11 +18,16 @@ const METRICS: { key: keyof ReferringDomain; header: string; date?: boolean }[] 
 /** CSV header row + a row-mapper mirroring the on-screen columns. */
 export const REFERRING_DOMAIN_CSV_HEADERS = [
   "Domain",
+  "Competitor",
   ...METRICS.map((m) => m.header),
 ];
 
 export function referringDomainCsvRow(d: ReferringDomain): string[] {
-  return [d.domain, ...METRICS.map((m) => String(d[m.key] ?? ""))];
+  return [
+    d.domain,
+    d.competitor ?? "",
+    ...METRICS.map((m) => String(d[m.key] ?? "")),
+  ];
 }
 
 function DomainCell({ d }: { d: ReferringDomain }) {
@@ -54,6 +59,20 @@ export function buildReferringDomainColumns(): ColumnDef<ReferringDomain>[] {
     cell: ({ row }) => <DomainCell d={row.original} />,
   };
 
+  const competitorCol: ColumnDef<ReferringDomain> = {
+    id: "competitor",
+    accessorFn: (d) => d.competitor ?? "",
+    header: "Competitor",
+    cell: ({ row }) => {
+      const c = row.original.competitor;
+      return c ? (
+        <span className="font-medium">{c}</span>
+      ) : (
+        <span className="text-muted-foreground">—</span>
+      );
+    },
+  };
+
   const rest: ColumnDef<ReferringDomain>[] = METRICS.map((c) => ({
     id: c.key,
     accessorKey: c.key,
@@ -66,5 +85,5 @@ export function buildReferringDomainColumns(): ColumnDef<ReferringDomain>[] {
     },
   }));
 
-  return [domainCol, ...rest];
+  return [domainCol, competitorCol, ...rest];
 }

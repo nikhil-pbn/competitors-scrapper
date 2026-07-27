@@ -1,4 +1,4 @@
-import type { AhrefsFilters } from "@/lib/ahrefs/types";
+import type { AhrefsFilters, RefdomainRange } from "@/lib/ahrefs/types";
 
 /**
  * Ahrefs API v3 filter/`where` builder.
@@ -15,11 +15,40 @@ import type { AhrefsFilters } from "@/lib/ahrefs/types";
 
 type Condition = { field: string; is: [string, ...unknown[]] };
 
-/** First day of the previous month as YYYY-MM-DD (for `history=since:`). */
-export function startOfLastMonth(now: Date = new Date()): string {
-  const year = now.getUTCFullYear();
-  const month = now.getUTCMonth(); // 0-based; previous month = month - 1
-  const d = new Date(Date.UTC(year, month - 1, 1));
+/** The "since" date (YYYY-MM-DD, UTC) for a range, or null for all-time. */
+export function sinceDateFor(
+  range: RefdomainRange,
+  now: Date = new Date(),
+): string | null {
+  const d = new Date(now.getTime());
+  switch (range) {
+    case "last_24h":
+      d.setUTCDate(d.getUTCDate() - 1);
+      break;
+    case "last_7d":
+      d.setUTCDate(d.getUTCDate() - 7);
+      break;
+    case "last_month":
+      d.setUTCMonth(d.getUTCMonth() - 1);
+      break;
+    case "last_3m":
+      d.setUTCMonth(d.getUTCMonth() - 3);
+      break;
+    case "last_6m":
+      d.setUTCMonth(d.getUTCMonth() - 6);
+      break;
+    case "last_year":
+      d.setUTCFullYear(d.getUTCFullYear() - 1);
+      break;
+    case "last_2y":
+      d.setUTCFullYear(d.getUTCFullYear() - 2);
+      break;
+    case "last_5y":
+      d.setUTCFullYear(d.getUTCFullYear() - 5);
+      break;
+    case "all":
+      return null;
+  }
   return d.toISOString().slice(0, 10);
 }
 
@@ -56,9 +85,8 @@ export function buildWhere(filters: AhrefsFilters): string | undefined {
   return JSON.stringify({ and: conditions });
 }
 
-/** The `history` value for the request, based on the "last month" filter. */
+/** The `history` value for the request, based on the selected date range. */
 export function buildHistory(filters: AhrefsFilters): string {
-  return filters.sinceLastMonth
-    ? `since:${startOfLastMonth()}`
-    : "live";
+  const since = sinceDateFor(filters.range ?? "last_month");
+  return since ? `since:${since}` : "live";
 }

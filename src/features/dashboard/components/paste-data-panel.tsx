@@ -14,11 +14,14 @@ export function PasteDataPanel({
   onChange,
   onUse,
   blocked,
+  useDisabled,
 }: {
   value: string;
   onChange: (value: string) => void;
   onUse: () => void;
   blocked: boolean;
+  /** Extra gate on the "Use pasted data" button (e.g. needs one competitor). */
+  useDisabled?: boolean;
 }) {
   return (
     <details className="mt-4 border-t border-border pt-4">
@@ -40,7 +43,10 @@ export function PasteDataPanel({
           className="w-full rounded-md border border-border bg-card p-3 font-mono text-sm outline-none placeholder:text-muted-foreground focus:border-ring"
         />
         <div className="flex justify-end">
-          <Button onClick={onUse} disabled={blocked || !value.trim()}>
+          <Button
+            onClick={onUse}
+            disabled={blocked || useDisabled || !value.trim()}
+          >
             Use pasted data
           </Button>
         </div>

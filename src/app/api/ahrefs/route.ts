@@ -18,7 +18,19 @@ const filtersSchema = z.object({
       "link_lost",
     ])
     .optional(),
-  sinceLastMonth: z.boolean().optional(),
+  range: z
+    .enum([
+      "last_24h",
+      "last_7d",
+      "last_month",
+      "last_3m",
+      "last_6m",
+      "last_year",
+      "last_2y",
+      "last_5y",
+      "all",
+    ])
+    .optional(),
   limit: z.number().int().min(1).max(5000).optional(),
 });
 
