@@ -4,8 +4,17 @@ import { getSheetsClient } from "@/lib/sheets/client";
 import { getSpreadsheetId } from "@/lib/env";
 
 /**
+ * Tabs that are NOT competitor data tabs and must never appear in the
+ * competitor picker, save targets, or /nodata filter. The "URLs" tab is a
+ * static Competitor-Name → URL reference/lookup that is never written to.
+ * Matched case-insensitively (trimmed).
+ */
+const NON_COMPETITOR_TABS = new Set(["urls"]);
+
+/**
  * Read all worksheet (tab) names from the master spreadsheet dynamically.
  * Names are never hardcoded — this is the source for the competitor dropdown.
+ * Non-competitor reference tabs (see NON_COMPETITOR_TABS) are filtered out.
  */
 export async function listWorksheetNames(): Promise<string[]> {
   const sheets = getSheetsClient();
@@ -20,6 +29,7 @@ export async function listWorksheetNames(): Promise<string[]> {
       index: s.properties?.index ?? 0,
     }))
     .filter((s) => s.title !== "")
+    .filter((s) => !NON_COMPETITOR_TABS.has(s.title.trim().toLowerCase()))
     .sort((a, b) => a.index - b.index)
     .map((s) => s.title);
 }
