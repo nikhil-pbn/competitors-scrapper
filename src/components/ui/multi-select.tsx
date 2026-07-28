@@ -38,14 +38,17 @@ export function MultiSelect({
         : [...selected, value],
     );
 
+  // Always list the selected values (comma-joined) so every choice stays
+  // visible — never collapse to "N selected". "All" is a shorthand only when
+  // literally everything is picked.
+  const allSelected =
+    options.length > 0 && selected.length === options.length;
   const summary =
     selected.length === 0
       ? placeholder
-      : options.length > 0 && selected.length === options.length
+      : allSelected
         ? "All"
-        : selected.length <= 2
-          ? selected.join(", ")
-          : `${selected.length} selected`;
+        : selected.join(", ");
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -53,14 +56,15 @@ export function MultiSelect({
         <button
           type="button"
           disabled={disabled}
+          title={selected.length > 0 ? selected.join(", ") : undefined}
           className={cn(
-            "flex h-9 w-full items-center justify-between gap-2 rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50",
+            "flex min-h-9 w-full items-center justify-between gap-2 rounded-lg border border-input bg-transparent px-2.5 py-1.5 text-sm outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50",
             className,
           )}
         >
           <span
             className={cn(
-              "truncate",
+              "text-left wrap-break-word",
               selected.length === 0 && "text-muted-foreground",
             )}
           >
