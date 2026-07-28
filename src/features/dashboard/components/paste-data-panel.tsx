@@ -37,7 +37,7 @@ export function PasteDataPanel({
         <textarea
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          disabled={blocked}
+          disabled={blocked || useDisabled}
           rows={6}
           placeholder={PLACEHOLDER}
           className="w-full rounded-md border border-border bg-card p-3 font-mono text-sm outline-none placeholder:text-muted-foreground focus:border-ring"
