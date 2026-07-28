@@ -297,6 +297,12 @@ competitor is in the **Save-to** scope.
     skippedDuplicates, received, addedUrls }`.
 - **Audit:** best-effort `logSave()` (see §9) records who saved, which tab, and
   the counts.
+- **Tab link:** the route resolves a deep link to the tab
+  (`lib/sheets/worksheets.ts → getWorksheetGid()` + `worksheetTabUrl()`, e.g.
+  `…/edit?gid=684339755#gid=684339755`) and returns it as `summary.tabUrl`.
+  After a save, `SaveStatus` shows a **Go to worksheet** button that opens in a
+  new tab — linking straight to the tab when you saved to exactly one, or the
+  spreadsheet root when you saved to several.
 
 ---
 

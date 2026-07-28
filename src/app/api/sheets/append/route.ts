@@ -4,6 +4,7 @@ import { z } from "zod";
 import { logSave } from "@/lib/audit/store";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { appendRecords } from "@/lib/sheets/append";
+import { getWorksheetGid, worksheetTabUrl } from "@/lib/sheets/worksheets";
 
 export const dynamic = "force-dynamic";
 
@@ -46,9 +47,25 @@ export async function POST(request: NextRequest) {
       parsed.data.records,
     );
 
+    // Deep link to the tab for the "Go to worksheet" button (best-effort;
+    // falls back to the spreadsheet root if the gid can't be resolved).
+    let tabUrl: string;
+    try {
+      tabUrl = worksheetTabUrl(await getWorksheetGid(parsed.data.worksheet));
+    } catch {
+      tabUrl = worksheetTabUrl(null);
+    }
+
+    // Who did it (best-effort — never fail the save on an identity hiccup).
+    let user = "unknown";
+    try {
+      user = (await getCurrentUser()) ?? "unknown";
+    } catch {
+      // ignore
+    }
+
     // Best-effort audit — never let a logging hiccup fail the save.
     try {
-      const user = (await getCurrentUser()) ?? "unknown";
       await logSave({
         user,
         worksheet: parsed.data.worksheet,
@@ -62,7 +79,7 @@ export async function POST(request: NextRequest) {
       // ignore audit failures
     }
 
-    return NextResponse.json({ summary });
+    return NextResponse.json({ summary: { ...summary, tabUrl } });
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Failed to append rows.";

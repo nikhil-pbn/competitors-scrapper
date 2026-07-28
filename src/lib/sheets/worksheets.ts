@@ -33,3 +33,22 @@ export async function listWorksheetNames(): Promise<string[]> {
     .sort((a, b) => a.index - b.index)
     .map((s) => s.title);
 }
+
+/** The numeric sheetId (gid) of a tab by title, or null if not found. */
+export async function getWorksheetGid(title: string): Promise<number | null> {
+  const sheets = getSheetsClient();
+  const res = await sheets.spreadsheets.get({
+    spreadsheetId: getSpreadsheetId(),
+    fields: "sheets.properties(title,sheetId)",
+  });
+  const match = (res.data.sheets ?? []).find(
+    (s) => s.properties?.title === title,
+  );
+  return match?.properties?.sheetId ?? null;
+}
+
+/** A deep link to a specific worksheet tab (falls back to the spreadsheet). */
+export function worksheetTabUrl(gid: number | null): string {
+  const base = `https://docs.google.com/spreadsheets/d/${getSpreadsheetId()}/edit`;
+  return gid == null ? base : `${base}?gid=${gid}#gid=${gid}`;
+}

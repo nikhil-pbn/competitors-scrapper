@@ -1,8 +1,30 @@
 "use client";
 
+import { ExternalLink } from "lucide-react";
+
 import type { AppendSummary } from "@/lib/types";
 import { Spinner } from "@/components/ui";
 import type { Phase } from "@/features/dashboard/pipeline";
+
+/**
+ * Where the "Go to worksheet" button points:
+ *  - saved to exactly one tab → that tab's deep link
+ *  - saved to several tabs → the spreadsheet root
+ * (based on how many tabs were saved, not on how many rows changed).
+ */
+function worksheetLink(summaries: AppendSummary[]): { href: string; label: string } | null {
+  const anyUrl = summaries.find((s) => s.tabUrl)?.tabUrl;
+  const rootUrl = anyUrl ? anyUrl.split("?gid=")[0] : undefined;
+
+  if (summaries.length === 1 && summaries[0].tabUrl) {
+    return {
+      href: summaries[0].tabUrl,
+      label: `Go to ${summaries[0].worksheet} tab`,
+    };
+  }
+  if (rootUrl) return { href: rootUrl, label: "Go to worksheet" };
+  return null;
+}
 
 /** Save-flow feedback shown next to the Save button (loading + per-tab success). */
 export function SaveStatus({
@@ -24,6 +46,7 @@ export function SaveStatus({
   if (phase === "saved" && summaries.length > 0) {
     const totalAdded = summaries.reduce((n, s) => n + s.added, 0);
     const totalUpdated = summaries.reduce((n, s) => n + s.updated, 0);
+    const link = worksheetLink(summaries);
 
     return (
       <div className="save-pop mb-4 flex items-start gap-4 rounded-lg border border-green-300 bg-linear-to-r from-green-50 to-emerald-50 px-4 py-4 dark:border-green-900 dark:from-green-950/50 dark:to-emerald-950/40">
@@ -48,6 +71,17 @@ export function SaveStatus({
               </li>
             ))}
           </ul>
+          {link ? (
+            <a
+              href={link.href}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+            >
+              {link.label}
+              <ExternalLink className="size-3.5" />
+            </a>
+          ) : null}
         </div>
       </div>
     );

@@ -126,4 +126,6 @@ export interface AppendSummary {
   skippedDuplicates: number;
   /** Total records received for this save. */
   received: number;
+  /** Deep link to this worksheet tab (set by the API for the "Go to worksheet" button). */
+  tabUrl?: string;
 }
