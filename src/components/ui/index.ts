@@ -8,6 +8,7 @@ export * from "@/components/ui/spinner";
 export * from "@/components/ui/separator";
 export * from "@/components/ui/table";
 export * from "@/components/ui/popover";
+export * from "@/components/ui/tooltip";
 export * from "@/components/ui/multi-select";
 // Project wrapper over shadcn's Field primitives (label + hint API).
 export { Field } from "@/components/ui/labeled-field";

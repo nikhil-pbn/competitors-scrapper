@@ -249,6 +249,16 @@ analyzes only the domains whose competitor is in the scope.
   (`html.ts` JSON-LD parsing, `location.ts` address/US-state, `contact-fields.ts`
   name/email/phone/doctor), assembled by **`normalize.ts → normalizeFromHtml()`**
   into a `BusinessRecord`.
+- **Junk guardrails (`lib/contact-quality.ts`):** fake-looking phone/email are
+  detected but *kept* — phones that are all-same/two-digit (`9999999999`),
+  sequential (`1234567890`), or have an invalid NANP area code/exchange; and
+  emails on placeholder domains (`abc@xyz.com`), all-identical local parts
+  (`gggggg@…`), or image/asset filenames. `normalizeFromHtml()` prefers a
+  real-looking candidate but falls back to the junk one so it's still visible.
+  In the contact table those values render **red (struck through)** with a
+  tooltip whose **"Add to sheet"** button overrides the guard for that row; on
+  Save, `ContactDetailsSection` blanks junk phone/email unless overridden, so
+  they never reach the sheet (`/nodata`'s manual data is left untouched).
 
 Records stream into the **Contact details** table live as they complete.
 

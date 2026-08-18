@@ -7,6 +7,11 @@ export function sourceKey(url: string): string {
     .toLowerCase();
 }
 
+/** Stable key for a per-row phone/email "add to sheet" override. */
+export function approvalKey(url: string, field: "phone" | "email"): string {
+  return `${sourceKey(url)}::${field}`;
+}
+
 /** Ensure a manually-entered URL has a protocol so links work. */
 export function normalizeSourceUrl(url: string): string {
   const u = url.trim();

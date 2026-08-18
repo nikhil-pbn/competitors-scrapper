@@ -48,7 +48,11 @@ export function extractPracticeName($: Dom): string {
   return "";
 }
 
-/** Emails from mailto: links and raw text, filtered of image/file false positives. */
+/**
+ * Emails from mailto: links and raw text, minus image/file false positives.
+ * Fake/placeholder addresses are kept here (so they can be shown in the table)
+ * and only stripped at save time via `lib/contact-quality.ts`.
+ */
 export function extractEmails($: Dom): string[] {
   const found = new Set<string>();
 
@@ -68,7 +72,11 @@ export function extractEmails($: Dom): string[] {
   return [...found];
 }
 
-/** Phone numbers from tel: links and raw text. */
+/**
+ * Phone numbers from tel: links and raw text. Fake/placeholder numbers are kept
+ * here (so they can be shown in the table) and only stripped at save time via
+ * `lib/contact-quality.ts`.
+ */
 export function extractPhones($: Dom): string[] {
   const found = new Set<string>();
 

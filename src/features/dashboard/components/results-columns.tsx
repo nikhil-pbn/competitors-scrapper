@@ -1,7 +1,19 @@
 import type { ColumnDef } from "@tanstack/react-table";
 
 import type { BusinessRecord } from "@/lib/types";
+import { cn } from "@/lib/utils";
 import { stripProtocol } from "@/lib/format";
+import { isJunkEmail, isJunkPhone } from "@/lib/contact-quality";
+import { approvalKey } from "@/features/dashboard/keys";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui";
+
+type ContactField = "phone" | "email";
+
+/** How a phone/email save-override toggle is wired in. */
+export interface ApprovalControls {
+  approved: Set<string>;
+  onToggle: (record: BusinessRecord, field: ContactField) => void;
+}
 
 export const RESULT_COLUMNS: { key: keyof BusinessRecord; header: string }[] = [
   { key: "practice_name", header: "Practice" },
@@ -54,12 +66,67 @@ function SourceLink({ value }: { value: string }) {
 }
 
 /**
+ * A phone/email cell. When the value looks fake it's shown in red (struck
+ * through) and, by default, stripped at save time. Hovering opens a tooltip
+ * with an "Add to sheet" button to override that for this row (turns it green
+ * and keeps it on save); a "Remove" button undoes the override.
+ */
+function ContactCell({
+  value,
+  field,
+  record,
+  controls,
+}: {
+  value: string;
+  field: ContactField;
+  record: BusinessRecord;
+  controls?: ApprovalControls;
+}) {
+  const junk = field === "phone" ? isJunkPhone(value) : isJunkEmail(value);
+  if (!junk) return <>{value}</>;
+
+  const approved = controls?.approved.has(approvalKey(record.source_url, field)) ?? false;
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span
+          className={cn(
+            "cursor-default font-medium",
+            approved
+              ? "text-green-600 dark:text-green-400"
+              : "text-red-600 line-through decoration-red-600/40 dark:text-red-400",
+          )}
+        >
+          {value}
+        </span>
+      </TooltipTrigger>
+      <TooltipContent>
+        <div className="flex items-center gap-2">
+          <span>{approved ? "Will be saved" : "Looks fake — won't be saved"}</span>
+          {controls ? (
+            <button
+              type="button"
+              onClick={() => controls.onToggle(record, field)}
+              className="rounded bg-background px-2 py-0.5 text-[11px] font-medium text-foreground hover:opacity-80"
+            >
+              {approved ? "Remove" : "Add to sheet"}
+            </button>
+          ) : null}
+        </div>
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
+/**
  * Contact-table columns: a select checkbox, the data columns, and an optional
  * "Move to no-data" action (only shown for unchecked rows, so it's a deliberate
  * two-step: uncheck to skip from save, then optionally push it to no-data).
  */
 export function buildResultColumns(
   onExclude?: (record: BusinessRecord) => void,
+  approvals?: ApprovalControls,
 ): ColumnDef<BusinessRecord>[] {
   const selectCol: ColumnDef<BusinessRecord> = {
     id: "select",
@@ -97,10 +164,20 @@ export function buildResultColumns(
     id: c.key,
     accessorKey: c.key,
     header: c.header,
-    cell: ({ getValue }) => {
+    cell: ({ row, getValue }) => {
       const value = String(getValue() ?? "");
       if (!value) return <span className="text-muted-foreground">—</span>;
       if (c.key === "source_url") return <SourceLink value={value} />;
+      if (c.key === "phone" || c.key === "email") {
+        return (
+          <ContactCell
+            value={value}
+            field={c.key}
+            record={row.original}
+            controls={approvals}
+          />
+        );
+      }
       return value;
     },
   }));

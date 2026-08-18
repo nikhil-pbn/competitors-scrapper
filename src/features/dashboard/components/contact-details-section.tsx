@@ -1,12 +1,14 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import type { RowSelectionState } from "@tanstack/react-table";
 
 import type { AppendSummary, BusinessRecord } from "@/lib/types";
 import { Button, Card, MultiSelect, Spinner } from "@/components/ui";
 import { TableSkeleton } from "@/components/data-table";
+import { isJunkEmail, isJunkPhone } from "@/lib/contact-quality";
+import { approvalKey } from "@/features/dashboard/keys";
 import type { NoDataItem } from "@/features/dashboard/selectors";
 import type { Phase } from "@/features/dashboard/pipeline";
 import { AddRecordForm } from "@/features/dashboard/components/add-record-form";
@@ -45,11 +47,47 @@ export function ContactDetailsSection(props: ContactDetailsSectionProps) {
   // Controlled row selection, reset to "all selected" when the row set changes
   // (adjust-state-during-render — no effect, no setState-in-effect).
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
+  // Per-row "add to sheet" overrides for junk-looking phone/email values.
+  const [approved, setApproved] = useState<Set<string>>(new Set());
   const [prevRecords, setPrevRecords] = useState(tableRecords);
   if (tableRecords !== prevRecords) {
     setPrevRecords(tableRecords);
     setRowSelection(allSelected(tableRecords));
+    setApproved(new Set());
   }
+
+  const toggleApprove = useCallback(
+    (record: BusinessRecord, field: "phone" | "email") => {
+      setApproved((prev) => {
+        const next = new Set(prev);
+        const key = approvalKey(record.source_url, field);
+        if (next.has(key)) next.delete(key);
+        else next.add(key);
+        return next;
+      });
+    },
+    [],
+  );
+  const approvals = useMemo(
+    () => ({ approved, onToggle: toggleApprove }),
+    [approved, toggleApprove],
+  );
+
+  // Blank junk phone/email at save time unless the row was overridden.
+  const cleanForSave = useCallback(
+    (r: BusinessRecord): BusinessRecord => ({
+      ...r,
+      phone:
+        isJunkPhone(r.phone) && !approved.has(approvalKey(r.source_url, "phone"))
+          ? ""
+          : r.phone,
+      email:
+        isJunkEmail(r.email) && !approved.has(approvalKey(r.source_url, "email"))
+          ? ""
+          : r.email,
+    }),
+    [approved],
+  );
 
   // Competitor save scope — all present competitors by default; reset when the
   // present set changes (not on every row edit).
@@ -102,7 +140,10 @@ export function ContactDetailsSection(props: ContactDetailsSectionProps) {
               className="w-44"
             />
           ) : null}
-          <Button onClick={() => props.onSave(toSave)} disabled={!canSave}>
+          <Button
+            onClick={() => props.onSave(toSave.map(cleanForSave))}
+            disabled={!canSave}
+          >
             {phase === "saving" ? (
               <>
                 <Spinner />
@@ -141,6 +182,7 @@ export function ContactDetailsSection(props: ContactDetailsSectionProps) {
           rowSelection={rowSelection}
           onRowSelectionChange={setRowSelection}
           onExclude={props.onExclude}
+          approvals={approvals}
           exportDisabled={blocked}
         />
       ) : phase !== "analyze" ? (

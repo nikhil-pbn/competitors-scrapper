@@ -15,12 +15,13 @@ import {
 
 import type { BusinessRecord } from "@/lib/types";
 import { downloadCsv } from "@/lib/csv";
-import { Button } from "@/components/ui";
+import { Button, TooltipProvider } from "@/components/ui";
 import { FilterInput, TablePagination } from "@/components/data-table";
 import {
   RESULT_CSV_HEADERS,
   buildResultColumns,
   resultCsvRow,
+  type ApprovalControls,
 } from "@/features/dashboard/components/results-columns";
 
 /**
@@ -33,17 +34,22 @@ export function ResultsTable({
   rowSelection,
   onRowSelectionChange,
   onExclude,
+  approvals,
   exportDisabled,
 }: {
   records: BusinessRecord[];
   rowSelection: RowSelectionState;
   onRowSelectionChange: OnChangeFn<RowSelectionState>;
   onExclude?: (record: BusinessRecord) => void;
+  approvals?: ApprovalControls;
   exportDisabled?: boolean;
 }) {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [globalFilter, setGlobalFilter] = useState("");
-  const columns = useMemo(() => buildResultColumns(onExclude), [onExclude]);
+  const columns = useMemo(
+    () => buildResultColumns(onExclude, approvals),
+    [onExclude, approvals],
+  );
 
   const table = useReactTable({
     data: records,
@@ -62,6 +68,7 @@ export function ResultsTable({
   const selectedCount = table.getSelectedRowModel().rows.length;
 
   return (
+    <TooltipProvider>
     <div className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <FilterInput
@@ -140,5 +147,6 @@ export function ResultsTable({
 
       <TablePagination table={table} note={`${records.length} rows`} />
     </div>
+    </TooltipProvider>
   );
 }
