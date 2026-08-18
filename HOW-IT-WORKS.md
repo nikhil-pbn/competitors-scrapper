@@ -303,6 +303,11 @@ competitor is in the **Save-to** scope.
     changed) vs unchanged, and returns `addedUrls`. Maps `BusinessRecord` fields
     to the sheet's own header columns by name.
   - Applies `values.batchUpdate` (updates) + `values.append` (new rows).
+  - **`date_added` column:** each new row is stamped with today's date (IST,
+    `YYYY-MM-DD`) so the team can sort/filter to see what was added when.
+    In-place updates keep their original date. The column is matched by header
+    (`date_added` / `added_on` / `added_date`, case-insensitive) and
+    **auto-created** if a tab doesn't have one.
   - Returns an `AppendSummary { worksheet, added, updated, unchanged,
     skippedDuplicates, received, addedUrls }`.
 - **Audit:** best-effort `logSave()` (see §9) records who saved, which tab, and
