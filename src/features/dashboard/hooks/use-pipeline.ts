@@ -3,7 +3,11 @@
 import { useCallback, useReducer, useRef } from "react";
 
 import type { AppendSummary, BusinessRecord, ReferringDomain } from "@/lib/types";
-import { analyzeDomains, appendToSheet } from "@/lib/client-api";
+import {
+  analyzeDomains,
+  appendToSheet,
+  classifyDomains,
+} from "@/lib/client-api";
 import { sourceKey } from "@/features/dashboard/keys";
 import {
   initialPipelineState,
@@ -17,8 +21,9 @@ const errMsg = (e: unknown, fallback: string) =>
   e instanceof Error ? e.message : fallback;
 
 /**
- * Owns the Ahrefs → analyze → save pipeline. Source loaders (Search/Sample/
- * Paste/Upload) live in useDomainSources; here we add analyze + a per-tab save.
+ * Owns the Ahrefs → dental check → analyze → save pipeline. Source loaders
+ * (Search/Sample/Paste/Upload) live in useDomainSources; here we add the
+ * dental check, analyze, and a per-tab save.
  * `onReset` fires whenever a new source loads or analysis starts.
  */
 export function usePipeline(onReset: () => void) {
@@ -28,6 +33,28 @@ export function usePipeline(onReset: () => void) {
     dispatch,
     onReset,
   );
+
+  // Pre-analyze: classify each domain as dental / non-dental (streamed).
+  // Duplicate domains (same site under two competitors) are checked once.
+  const classify = useCallback(async (domains: ReferringDomain[]) => {
+    const unique = [...new Map(domains.map((d) => [sourceKey(d.domain), d.domain])).values()];
+    if (unique.length === 0) return;
+    dispatch({ type: "classifyStart", total: unique.length });
+    try {
+      let failed = false;
+      await classifyDomains(unique, {
+        onProgress: (done, total, domain, check) =>
+          dispatch({ type: "classifyProgress", done, total, domain, check }),
+        onError: (message) => {
+          failed = true;
+          dispatch({ type: "fail", message });
+        },
+      });
+      if (!failed) dispatch({ type: "classifyDone" });
+    } catch (e) {
+      dispatch({ type: "fail", message: errMsg(e, "Dental check failed.") });
+    }
+  }, []);
 
   // Phase 2: analyze each domain's website (streamed), carrying its competitor.
   const analyze = useCallback(
@@ -98,8 +125,19 @@ export function usePipeline(onReset: () => void) {
 
   const busy =
     state.phase === "ahrefs" ||
+    state.phase === "classify" ||
     state.phase === "analyze" ||
     state.phase === "saving";
 
-  return { ...state, busy, search, sample, usePasted, upload, analyze, save };
+  return {
+    ...state,
+    busy,
+    search,
+    sample,
+    usePasted,
+    upload,
+    classify,
+    analyze,
+    save,
+  };
 }

@@ -1,10 +1,15 @@
 /**
  * Browser-side helpers for calling the phase API routes. No business logic —
- * just request/response plumbing (and SSE parsing for Phase 2).
+ * just request/response plumbing (and SSE parsing for analyze/classify).
  */
 
 import type { AhrefsFilters } from "@/lib/ahrefs/types";
-import type { AppendSummary, BusinessRecord, ReferringDomain } from "@/lib/types";
+import type {
+  AppendSummary,
+  BusinessRecord,
+  DentalCheck,
+  ReferringDomain,
+} from "@/lib/types";
 
 async function postJson<T>(url: string, body: unknown): Promise<T> {
   const res = await fetch(url, {
@@ -51,29 +56,25 @@ export async function appendToSheet(
   return data.summary;
 }
 
-export interface AnalyzeCallbacks {
-  onProgress?: (done: number, total: number, record: BusinessRecord) => void;
-  onDone?: (records: BusinessRecord[]) => void;
-  onError?: (message: string) => void;
-}
-
 /**
- * Phase 2: stream website analysis via Server-Sent Events. Parses the event
- * stream and dispatches progress/done/error callbacks. Returns when complete.
+ * POST JSON and read a Server-Sent Events response, calling `onEvent` for each
+ * frame. Reports a failed start (non-2xx) as an `error` event.
  */
-export async function analyzeDomains(
-  domains: string[],
-  callbacks: AnalyzeCallbacks,
+async function streamSse(
+  url: string,
+  body: unknown,
+  onEvent: (event: string, payload: Record<string, unknown>) => void,
+  startError: string,
 ): Promise<void> {
-  const res = await fetch("/api/analyze", {
+  const res = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ domains }),
+    body: JSON.stringify(body),
   });
 
   if (!res.ok || !res.body) {
     const data = await res.json().catch(() => ({}));
-    callbacks.onError?.(data?.error ?? "Analysis failed to start.");
+    onEvent("error", { error: data?.error ?? startError });
     return;
   }
 
@@ -98,16 +99,70 @@ export async function analyzeDomains(
         if (line.startsWith("event:")) event = line.slice(6).trim();
         else if (line.startsWith("data:")) data += line.slice(5).trim();
       }
-      if (!data) continue;
-
-      const payload = JSON.parse(data);
-      if (event === "progress") {
-        callbacks.onProgress?.(payload.done, payload.total, payload.record);
-      } else if (event === "done") {
-        callbacks.onDone?.(payload.records);
-      } else if (event === "error") {
-        callbacks.onError?.(payload.error);
-      }
+      if (data) onEvent(event, JSON.parse(data));
     }
   }
+}
+
+export interface AnalyzeCallbacks {
+  onProgress?: (done: number, total: number, record: BusinessRecord) => void;
+  onDone?: (records: BusinessRecord[]) => void;
+  onError?: (message: string) => void;
+}
+
+/** Phase 2: stream website analysis via Server-Sent Events. */
+export async function analyzeDomains(
+  domains: string[],
+  callbacks: AnalyzeCallbacks,
+): Promise<void> {
+  await streamSse(
+    "/api/analyze",
+    { domains },
+    (event, p) => {
+      if (event === "progress") {
+        callbacks.onProgress?.(
+          p.done as number,
+          p.total as number,
+          p.record as BusinessRecord,
+        );
+      } else if (event === "done") {
+        callbacks.onDone?.(p.records as BusinessRecord[]);
+      } else if (event === "error") {
+        callbacks.onError?.(p.error as string);
+      }
+    },
+    "Analysis failed to start.",
+  );
+}
+
+export interface ClassifyCallbacks {
+  onProgress?: (done: number, total: number, domain: string, check: DentalCheck) => void;
+  onDone?: () => void;
+  onError?: (message: string) => void;
+}
+
+/** Pre-analyze: stream the dental/non-dental check via Server-Sent Events. */
+export async function classifyDomains(
+  domains: string[],
+  callbacks: ClassifyCallbacks,
+): Promise<void> {
+  await streamSse(
+    "/api/classify",
+    { domains },
+    (event, p) => {
+      if (event === "progress") {
+        callbacks.onProgress?.(
+          p.done as number,
+          p.total as number,
+          p.domain as string,
+          p.check as DentalCheck,
+        );
+      } else if (event === "done") {
+        callbacks.onDone?.();
+      } else if (event === "error") {
+        callbacks.onError?.(p.error as string);
+      }
+    },
+    "Dental check failed to start.",
+  );
 }

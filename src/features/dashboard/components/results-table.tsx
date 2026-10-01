@@ -51,6 +51,9 @@ export function ResultsTable({
     [onExclude, approvals],
   );
 
+  // TanStack Table is not React Compiler–compatible; the compiler skips this
+  // component, which is expected and safe.
+  // eslint-disable-next-line react-hooks/incompatible-library
   const table = useReactTable({
     data: records,
     columns,

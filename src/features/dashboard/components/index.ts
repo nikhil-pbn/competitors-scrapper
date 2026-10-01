@@ -2,6 +2,7 @@ export * from "@/features/dashboard/components/add-record-form";
 export * from "@/features/dashboard/components/competitor-fields";
 export * from "@/features/dashboard/components/contact-details-section";
 export * from "@/features/dashboard/components/data-source-badge";
+export * from "@/features/dashboard/components/dental-badge";
 export * from "@/features/dashboard/components/filter-panel";
 export * from "@/features/dashboard/components/no-data-notice";
 export * from "@/features/dashboard/components/paste-data-panel";

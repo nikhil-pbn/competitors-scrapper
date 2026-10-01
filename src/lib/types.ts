@@ -113,6 +113,21 @@ export function emptyBusinessRecord(sourceUrl: string): BusinessRecord {
   };
 }
 
+/**
+ * Pre-analyze check: is a referring domain a dental practice website?
+ * `Unknown` = too little content to decide; `Failed` = site unreachable.
+ */
+export type DentalStatus = "Dental" | "Non-Dental" | "Unknown" | "Failed";
+
+export interface DentalCheck {
+  status: DentalStatus;
+  confidence: "High" | "Medium" | "Low";
+  /** Human-readable explanation of the decision. */
+  reason: string;
+  /** URLs whose content was read (homepage first). */
+  pagesChecked?: string[];
+}
+
 /** Phase 3 result: outcome of upserting records into a worksheet. */
 export interface AppendSummary {
   worksheet: string;

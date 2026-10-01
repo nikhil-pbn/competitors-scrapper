@@ -16,6 +16,10 @@ For each competitor (a tab in a master Google Sheet), the tool:
 
 1. **Phase 1 — Ahrefs:** fetch the competitor's *referring domains* (sites that
    link to it), filtered.
+   - *Optional dental check:* "Check dental" classifies each domain as
+     Dental / Non-Dental / Unknown / Failed from its page content
+     (`lib/dental/`, `POST /api/classify`, SSE). Analyze can then target
+     **All websites** or **Dental only**.
 2. **Phase 2 — Analyze:** visit each of those websites and scrape best-effort
    business contact details (practice name, phone, email, location…).
 3. **Phase 3 — Save:** append/update the reviewed rows into that competitor's
@@ -45,6 +49,7 @@ src/
     nodata/page.tsx       # manual-research workspace
     api/
       ahrefs/route.ts         # Phase 1
+      classify/route.ts       # dental check before Phase 2 (SSE)
       analyze/route.ts        # Phase 2 (SSE)
       sheets/append/route.ts  # Phase 3
       worksheets/route.ts     # list competitor tabs
@@ -62,6 +67,7 @@ src/
     dashboard/            # the whole main tool (see §4)
   lib/
     ahrefs/               # Phase 1 service (client, filters, types)
+    dental/               # dental check (classifier rules ported from the data enricher)
     analyzer/             # Phase 2 service (scraper, extractors, normalize)
     sheets/               # Phase 3 service (client, append, upsert, delete, ...)
     audit/store.ts        # save-audit log (Blob)
@@ -117,7 +123,8 @@ as that person. `/nodata` is open to any signed-in user.
   components. No business logic.
 - **`pipeline.ts`** — the **pure reducer** (`pipelineReducer`) + `PipelineState`.
   This is the single source of truth for the Ahrefs→analyze→save flow. Phases:
-  `idle → ahrefs → domains → analyze → ready → saving → saved` (+ `error`).
+  `idle → ahrefs → domains → [classify → domains] → analyze → ready → saving → saved`
+  (+ `error`). Dental results live in `state.dental`, keyed by `sourceKey(domain)`.
 - **Hooks:**
   - `hooks/use-worksheets.ts` — loads competitor tab names for the picker.
   - `hooks/use-pipeline.ts` — owns `useReducer(pipelineReducer)`, plus `analyze`

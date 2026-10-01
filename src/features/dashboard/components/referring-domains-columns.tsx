@@ -1,7 +1,19 @@
 import type { ColumnDef } from "@tanstack/react-table";
 
-import type { ReferringDomain } from "@/lib/types";
+import type { DentalCheck, DentalStatus, ReferringDomain } from "@/lib/types";
 import { formatDate } from "@/lib/format";
+import { DentalBadge } from "@/features/dashboard/components/dental-badge";
+
+/** A table row: the Ahrefs domain plus its dental-check result (if run). */
+export type DomainRow = ReferringDomain & { dental?: DentalCheck };
+
+/** Sort order for the Dental column (unchecked rows sort last). */
+const DENTAL_ORDER: Record<DentalStatus, number> = {
+  Dental: 0,
+  Unknown: 1,
+  "Non-Dental": 2,
+  Failed: 3,
+};
 
 const METRICS: { key: keyof ReferringDomain; header: string; date?: boolean }[] =
   [
@@ -19,13 +31,17 @@ const METRICS: { key: keyof ReferringDomain; header: string; date?: boolean }[] 
 export const REFERRING_DOMAIN_CSV_HEADERS = [
   "Domain",
   "Competitor",
+  "Dental",
+  "Dental reason",
   ...METRICS.map((m) => m.header),
 ];
 
-export function referringDomainCsvRow(d: ReferringDomain): string[] {
+export function referringDomainCsvRow(d: DomainRow): string[] {
   return [
     d.domain,
     d.competitor ?? "",
+    d.dental?.status ?? "",
+    d.dental?.reason ?? "",
     ...METRICS.map((m) => String(d[m.key] ?? "")),
   ];
 }
@@ -51,15 +67,15 @@ function DomainCell({ d }: { d: ReferringDomain }) {
 }
 
 /** Columns mirroring the Ahrefs "Referring domains" report. */
-export function buildReferringDomainColumns(): ColumnDef<ReferringDomain>[] {
-  const domainCol: ColumnDef<ReferringDomain> = {
+export function buildReferringDomainColumns(): ColumnDef<DomainRow>[] {
+  const domainCol: ColumnDef<DomainRow> = {
     id: "domain",
     accessorKey: "domain",
     header: "Domain",
     cell: ({ row }) => <DomainCell d={row.original} />,
   };
 
-  const competitorCol: ColumnDef<ReferringDomain> = {
+  const competitorCol: ColumnDef<DomainRow> = {
     id: "competitor",
     accessorFn: (d) => d.competitor ?? "",
     header: "Competitor",
@@ -73,7 +89,14 @@ export function buildReferringDomainColumns(): ColumnDef<ReferringDomain>[] {
     },
   };
 
-  const rest: ColumnDef<ReferringDomain>[] = METRICS.map((c) => ({
+  const dentalCol: ColumnDef<DomainRow> = {
+    id: "dental",
+    accessorFn: (d) => (d.dental ? DENTAL_ORDER[d.dental.status] : 9),
+    header: "Dental",
+    cell: ({ row }) => <DentalBadge check={row.original.dental} />,
+  };
+
+  const rest: ColumnDef<DomainRow>[] = METRICS.map((c) => ({
     id: c.key,
     accessorKey: c.key,
     header: c.header,
@@ -85,5 +108,5 @@ export function buildReferringDomainColumns(): ColumnDef<ReferringDomain>[] {
     },
   }));
 
-  return [domainCol, competitorCol, ...rest];
+  return [domainCol, competitorCol, dentalCol, ...rest];
 }

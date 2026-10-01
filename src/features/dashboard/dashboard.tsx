@@ -91,6 +91,7 @@ export function Dashboard() {
         phase={pipeline.phase}
         domainCount={pipeline.domains.length}
         recordCount={pipeline.records.length}
+        dental={pipeline.dental}
         progress={pipeline.progress}
         error={pipeline.error}
       />
@@ -98,9 +99,11 @@ export function Dashboard() {
       {pipeline.domains.length > 0 ? (
         <ReferringDomainsSection
           domains={pipeline.domains}
+          dental={pipeline.dental}
           dataSource={pipeline.dataSource}
           phase={pipeline.phase}
           blocked={blocked}
+          onCheckDental={(subset) => pipeline.classify(subset)}
           onAnalyze={(subset) => pipeline.analyze(subset)}
         />
       ) : pipeline.phase === "domains" ? (

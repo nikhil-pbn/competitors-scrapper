@@ -2,6 +2,7 @@ import "server-only";
 
 import { emptyBusinessRecord, type BusinessRecord } from "@/lib/types";
 import { normalizeFromHtml } from "@/lib/analyzer/normalize";
+import { mapWithConcurrency } from "@/lib/concurrency";
 
 const USER_AGENT =
   "Mozilla/5.0 (compatible; ReferringDomainsBot/1.0; +internal-seo-tool)";
@@ -89,27 +90,11 @@ export async function analyzeDomains(
     onProgress?: (progress: AnalyzeProgress) => void;
   } = {},
 ): Promise<BusinessRecord[]> {
-  const concurrency = options.concurrency ?? DEFAULT_CONCURRENCY;
-  const total = domains.length;
-  const results: BusinessRecord[] = new Array(total);
-  let cursor = 0;
-  let done = 0;
-
-  async function worker() {
-    while (cursor < total) {
-      const index = cursor++;
-      const record = await analyzeDomain(domains[index]);
-      results[index] = record;
-      done++;
-      options.onProgress?.({ done, total, record });
-    }
-  }
-
-  const workers = Array.from(
-    { length: Math.min(concurrency, total) },
-    () => worker(),
+  return mapWithConcurrency(
+    domains,
+    options.concurrency ?? DEFAULT_CONCURRENCY,
+    analyzeDomain,
+    (record, _index, done) =>
+      options.onProgress?.({ done, total: domains.length, record }),
   );
-  await Promise.all(workers);
-
-  return results;
 }
